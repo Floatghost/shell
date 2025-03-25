@@ -51,12 +51,12 @@ pub fn tokenize(input: &str) -> Vec<String> {
 /// }
 #[derive(Debug)]
 #[allow(unused)]
-pub struct Command_AND_ARGS {
+pub struct CommandAndArgs {
     pub command_and_args: Vec<String>,
 }
 
-pub fn group_commands(tokens: &Vec<String>) -> Vec<Vec<Command_AND_ARGS>> {
-    let mut out: Vec<Vec<Command_AND_ARGS>> = Vec::new();
+pub fn group_commands(tokens: &Vec<String>) -> Vec<Vec<CommandAndArgs>> {
+    let mut out: Vec<Vec<CommandAndArgs>> = Vec::new();
     let mut temp_commands: Vec<Vec<&str>> = Vec::new();
     let mut current: Vec<&str> = Vec::new();
 
@@ -82,7 +82,7 @@ pub fn group_commands(tokens: &Vec<String>) -> Vec<Vec<Command_AND_ARGS>> {
     out
 }
 
-fn construct_command(input: &Vec<&str>) -> Vec<Command_AND_ARGS> {
+fn construct_command(input: &Vec<&str>) -> Vec<CommandAndArgs> {
     let mut temp: Vec<Vec<&str>> = Vec::new();
     let mut current: Vec<&str> = Vec::new();
 
@@ -99,9 +99,9 @@ fn construct_command(input: &Vec<&str>) -> Vec<Command_AND_ARGS> {
         temp.push(current);
     }
 
-    let out: Vec<Command_AND_ARGS> = temp
+    let out: Vec<CommandAndArgs> = temp
     .iter()
-    .map(|part| Command_AND_ARGS {
+    .map(|part| CommandAndArgs {
         command_and_args: part.iter().map(|s| s.to_string()).collect()
     })
     .collect();
