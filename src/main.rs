@@ -2,44 +2,36 @@ use std::io::{self, Write};
 mod parse_input;
 use parse_input::*;
 mod execute;
-use execute::*;
-use std::env;
+mod app;
+mod command;
+
+use crate::{app::State, command::{BuiltIn, Command, Runner}};
 
 fn main() {
+    let mut state = State::new();
     
     loop {
-        //get User input
-        match env::var("USERNAME") {
-            Ok(name) => {
-                print!("{} $ ", name);
-            }
-            Err(_) => print!("$ "),
-        }
-        //print!("$ ");
+        
+        println!("{}", state.username);
+        print!("{}> ", state.cwd.to_str().unwrap());
+        
         io::stdout().flush().unwrap();
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
 
-        dbg!(&input);
-        
-        //triming and tokenize
-        input = input.trim().to_string();
-        let tokens = tokenize(&input);
-        //dbg!(&tokens);
-        
-        //Deviding up in sections using ( &, |, > ) so multiple commands can be executed at a time
-        let commands = group_commands(&tokens);
+        let tokens = tokenize(input.trim());
 
-        //loop execute command and potentialy pass output to next input
-        for command in commands {
-            if let Some(return_code) = execute_command(command) {
-                println!("{}", return_code);
-                break;
+        let internal_command = Command::new(&tokens[0], &tokens[1..]);
+
+        if let Some(command) = internal_command {
+            if let Runner::InBuilt(com) = &command.runner {
+                if com == &BuiltIn::Exit {
+                    break;
+                }
             }
+            
+            let return_code = command.exec(&mut state);
+            println!("{:?}", return_code);
         }
-
-        //if command is exit command exit
-
-        break;
     }
 }

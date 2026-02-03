@@ -16,7 +16,7 @@ pub fn execute_command(command: Vec<CommandAndArgs>) -> Option<i32> {
 
         if look_for_builtin(bin_name) {
             let is_last = i == command.len() - 1;
-            previous_output = run_builtin_with_args(bin_path, args, previous_output, is_last);
+            previous_output = run_builtin_with_args(PathBuf::new(), args, previous_output, is_last);
         }
         else if let Some(bin_path) = search_path_for_bin(bin_name) {
             let is_last = i == command.len() - 1;
