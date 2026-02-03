@@ -10,16 +10,18 @@ mod render;
 use crate::{
     app::State,
     command::{BuiltIn, Command, Runner},
-    config::ShellConfig, render::render_prompt,
+    config::ShellConfig,
+    render::render_prompt,
 };
 
 fn main() {
     let mut state = State::new();
     let config = ShellConfig::new("./shell.toml").unwrap();
-    
+
     loop {
+        state.refresh();
         render_prompt(&state, &config);
-        
+
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
 
