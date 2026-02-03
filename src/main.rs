@@ -5,22 +5,20 @@ mod app;
 mod command;
 mod config;
 mod execute;
+mod render;
 
 use crate::{
     app::State,
     command::{BuiltIn, Command, Runner},
-    config::ShellConfig,
+    config::ShellConfig, render::render_prompt,
 };
 
 fn main() {
     let mut state = State::new();
     let config = ShellConfig::new("./shell.toml").unwrap();
-
-    dbg!(&config);
     
     loop {
         render_prompt(&state, &config);
-        io::stdout().flush().unwrap();
         
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
@@ -44,16 +42,4 @@ fn main() {
             println!("{:?}", return_code);
         }
     }
-}
-
-fn render_prompt(state: &State, cfg: &ShellConfig) {
-    let fg = cfg.theme.fg.to_ansi_fg();
-    let bg = cfg.theme.bg.to_ansi_bg();
-    
-    // farbige Zeile (z. B. Username)
-    print!("{}{}{}", fg, bg, state.username);
-
-    // CMD-Prompt
-    println!("{}{} {}\x1b[0m", fg, bg, state.cwd.to_str().unwrap());
-    print!("{}{}> \x1b[0m", fg, bg);
 }
