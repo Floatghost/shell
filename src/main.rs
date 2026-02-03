@@ -16,6 +16,8 @@ fn main() {
     let mut state = State::new();
     let config = ShellConfig::new("./shell.toml").unwrap();
 
+    dbg!(&config);
+    
     loop {
         render_prompt(&state, &config);
         io::stdout().flush().unwrap();
