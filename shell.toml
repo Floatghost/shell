@@ -4,15 +4,25 @@ bg = "default"
 
 [prompt]
 lines = [
-    "{username} {cwd} -> ",
+    "{cwd} ({git}) {ram}",
+    "{username}@{hostname} -> ",
 ]
 
 [prompt.cwd]
-enabled = true
 fg = "magenta"
-format = "{cwd} lululul"
+format = "{cwd}"
 
 [prompt.username]
-enabled = true
 fg = "yellow"
 format = "👑{username}👑"
+
+[prompt.git]
+format = "{branch}{dirty}"
+
+
+[prompt.date]
+format = "{DD}-{MM}-{YYYY}"
+
+[prompt.ram]
+enabled = true
+format = "{used}/{total}"

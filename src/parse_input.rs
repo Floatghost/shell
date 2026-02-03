@@ -7,24 +7,24 @@ pub fn tokenize(input: &str) -> Vec<String> {
     while let Some(c) = chars.next() {
         match c {
             ' ' if in_quotes.is_none() => {
-                    if !current.is_empty() {
+                if !current.is_empty() {
+                    out.push(current);
+                    current = String::new();
+                }
+            }
+            '\'' | '"' => {
+                if let Some(q) = in_quotes {
+                    if q == c {
+                        in_quotes = None;
                         out.push(current);
                         current = String::new();
-                    }
-                },
-            '\'' | '"' => {
-                    if let Some(q) = in_quotes {
-                        if q == c {
-                            in_quotes = None;
-                            out.push(current);
-                            current = String::new();
-                        } else {
-                            current.push(c); // mismatched quote, treat as normal char
-                        }
                     } else {
-                        in_quotes = Some(c); // start quoted section
+                        current.push(c);
                     }
-                },
+                } else {
+                    in_quotes = Some(c);
+                }
+            }
             _ => {
                 current += &c.to_string();
             }
@@ -42,7 +42,7 @@ pub fn tokenize(input: &str) -> Vec<String> {
 /// find .txt
 /// in the input field you can put an other command or an file so in this example it could be
 /// ls -a
-/// 
+///
 /// other example
 /// command: output.txt
 /// input: {
@@ -64,8 +64,7 @@ pub fn group_commands(tokens: &Vec<String>) -> Vec<Vec<CommandAndArgs>> {
         if x == "&" && !current.is_empty() {
             temp_commands.push(current);
             current = Vec::new();
-        }
-        else if x != "&" {
+        } else if x != "&" {
             current.push(x);
         }
     }
@@ -77,7 +76,6 @@ pub fn group_commands(tokens: &Vec<String>) -> Vec<Vec<CommandAndArgs>> {
     for comm in &temp_commands {
         out.push(construct_command(comm));
     }
-
 
     out
 }
@@ -100,11 +98,11 @@ fn construct_command(input: &Vec<&str>) -> Vec<CommandAndArgs> {
     }
 
     let out: Vec<CommandAndArgs> = temp
-    .iter()
-    .map(|part| CommandAndArgs {
-        command_and_args: part.iter().map(|s| s.to_string()).collect()
-    })
-    .collect();
+        .iter()
+        .map(|part| CommandAndArgs {
+            command_and_args: part.iter().map(|s| s.to_string()).collect(),
+        })
+        .collect();
 
     out
 }

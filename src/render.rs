@@ -1,8 +1,12 @@
+use std::collections::HashMap;
 use std::io::Write;
+
+use chrono::Local;
+use sysinfo::System;
 
 use crate::{
     app::State,
-    config::{Color, ColorValue, ShellConfig},
+    config::{ColorValue, ShellConfig},
 };
 
 pub fn render_prompt(state: &State, cfg: &ShellConfig) {
@@ -16,25 +20,204 @@ pub fn render_prompt(state: &State, cfg: &ShellConfig) {
 }
 
 fn construct_prompt(state: &State, cfg: &ShellConfig) -> String {
-    let tokens = tokenize_prompt(&cfg.prompt.lines);
-
     let mut blocks = Blocks::new();
 
     let def_fg = cfg.theme.fg.clone();
     let def_bg = cfg.theme.bg.clone();
 
-    for token in tokens {
-        match token {
-            Token::Text(text) => blocks.push(&text, def_fg.clone(), def_bg.clone()),
-            Token::NewLine => blocks.push("\n", def_fg.clone(), def_bg.clone()),
-            Token::Value(val) => {
-                let (data, (fg, bg)) = val.get_value(state, cfg);
-                blocks.push(&data, fg, bg);
+    for (idx, line) in cfg.prompt.lines.iter().enumerate() {
+        let tokens = tokenize(line);
+        for token in tokens {
+            match token {
+                Token::Text(text) => blocks.push(&text, def_fg.clone(), def_bg.clone()),
+                Token::Placeholder(key) => {
+                    if let Some((text, (fg, bg))) = render_segment_by_name(&key, state, cfg) {
+                        blocks.push(&text, fg, bg);
+                    } else {
+                    }
+                }
             }
+        }
+        if idx != cfg.prompt.lines.len() - 1 {
+            blocks.push("\n", def_fg.clone(), def_bg.clone());
         }
     }
 
     blocks.build()
+}
+
+#[derive(Debug, Clone)]
+pub enum Token {
+    Text(String),
+    Placeholder(String),
+}
+
+pub fn tokenize(input: &str) -> Vec<Token> {
+    let mut tokens = Vec::new();
+    let mut current_text = String::new();
+    let mut inside_placeholder = false;
+
+    for c in input.chars() {
+        if c == '{' {
+            if !inside_placeholder {
+                if !current_text.is_empty() {
+                    tokens.push(Token::Text(current_text.clone()));
+                    current_text.clear();
+                }
+                inside_placeholder = true;
+            } else {
+                // Nested '{' or "{{" - treat previous as text part of placeholder?
+                // For simplicity, just append to current key
+                current_text.push(c);
+            }
+        } else if c == '}' {
+            if inside_placeholder {
+                tokens.push(Token::Placeholder(current_text.clone()));
+                current_text.clear();
+                inside_placeholder = false;
+            } else {
+                current_text.push(c);
+            }
+        } else {
+            current_text.push(c);
+        }
+    }
+
+    if !current_text.is_empty() {
+        if inside_placeholder {
+            tokens.push(Token::Text(format!("{{{}", current_text)));
+        } else {
+            tokens.push(Token::Text(current_text));
+        }
+    }
+
+    tokens
+}
+
+fn render_segment_generic<F>(
+    segment_name: &str,
+    state: &State,
+    cfg: &ShellConfig,
+    build_map: F,
+) -> Option<(String, (ColorValue, ColorValue))>
+where
+    F: Fn(&State) -> Option<HashMap<String, String>>,
+{
+    let seg_cfg = cfg.segments.get(segment_name)?;
+
+    if !seg_cfg.enabled {
+        return None;
+    }
+
+    let values = build_map(state)?;
+
+    let tokens = tokenize(&seg_cfg.format);
+    let mut output = String::new();
+
+    for token in tokens {
+        match token {
+            Token::Text(t) => output.push_str(&t),
+            Token::Placeholder(key) => {
+                if let Some(val) = values.get(&key) {
+                    output.push_str(val);
+                }
+            }
+        }
+    }
+
+    Some((output, (seg_cfg.fg.clone(), seg_cfg.bg.clone())))
+}
+
+fn render_segment_by_name(
+    name: &str,
+    state: &State,
+    cfg: &ShellConfig,
+) -> Option<(String, (ColorValue, ColorValue))> {
+    let full_key = if name.starts_with("prompt.") {
+        name.to_string()
+    } else {
+        format!("prompt.{}", name)
+    };
+
+    match name {
+        "cwd" | "prompt.cwd" => render_segment_generic(&full_key, state, cfg, |s| {
+            let mut map = HashMap::new();
+            map.insert("cwd".to_string(), s.cwd.display().to_string());
+            Some(map)
+        }),
+        "username" | "prompt.username" => render_segment_generic(&full_key, state, cfg, |s| {
+            let mut map = HashMap::new();
+            map.insert("username".to_string(), s.username.clone());
+            Some(map)
+        }),
+        "time" | "prompt.time" => render_segment_generic(&full_key, state, cfg, |_| {
+            let now = Local::now();
+            let mut map = HashMap::new();
+            map.insert("HH".to_string(), now.format("%H").to_string());
+            map.insert("MM".to_string(), now.format("%M").to_string());
+            map.insert("SS".to_string(), now.format("%S").to_string());
+            map.insert("time".to_string(), now.format("%H:%M:%S").to_string());
+            Some(map)
+        }),
+        "date" | "prompt.date" => render_segment_generic(&full_key, state, cfg, |_| {
+            let now = Local::now();
+            let mut map = HashMap::new();
+            map.insert("YYYY".to_string(), now.format("%Y").to_string());
+            map.insert("MM".to_string(), now.format("%m").to_string());
+            map.insert("DD".to_string(), now.format("%d").to_string());
+            Some(map)
+        }),
+        "git" | "prompt.git" => render_segment_generic(&full_key, state, cfg, |s| {
+            let git = s.git.as_ref()?;
+            let mut map = HashMap::new();
+            map.insert("branch".to_string(), git.branch.clone());
+            map.insert(
+                "dirty".to_string(),
+                if git.dirty {
+                    "*".to_string()
+                } else {
+                    "".to_string()
+                },
+            );
+            Some(map)
+        }),
+        "ram" | "prompt.ram" => render_segment_generic(&full_key, state, cfg, |s| {
+            let used = s.system.used_memory();
+            let total = s.system.total_memory();
+            let percent = if total > 0 {
+                (used as f64 / total as f64) * 100.0
+            } else {
+                0.0
+            };
+
+            let mut map = HashMap::new();
+            map.insert(
+                "used".to_string(),
+                format!("{:.2}GB", used as f64 / 1024.0 / 1024.0 / 1000.0),
+            );
+            map.insert(
+                "total".to_string(),
+                format!("{:.2}GB", total as f64 / 1024.0 / 1024.0 / 1000.0),
+            );
+            map.insert("percent".to_string(), format!("{:.0}", percent));
+            map.insert("ram".to_string(), format!("{:.0}", percent));
+            Some(map)
+        }),
+        "cpu" | "prompt.cpu" => render_segment_generic(&full_key, state, cfg, |s| {
+            let usage = s.system.global_cpu_usage();
+            let mut map = HashMap::new();
+            map.insert("usage".to_string(), format!("{:.0}", usage));
+            map.insert("cpu".to_string(), format!("{:.0}", usage));
+            Some(map)
+        }),
+        "hostname" | "prompt.hostname" => render_segment_generic(&full_key, state, cfg, |_| {
+            let host = System::host_name().unwrap_or_else(|| "localhost".to_string());
+            let mut map = HashMap::new();
+            map.insert("hostname".to_string(), host);
+            Some(map)
+        }),
+        _ => None, // or render Unknown
+    }
 }
 
 pub struct Blocks {
@@ -66,156 +249,43 @@ impl Blocks {
     }
 }
 
-pub enum Token {
-    Text(String),
-    NewLine,
-    Value(Insert),
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-pub enum Insert {
-    CWD,
-    Username,
-    Hostname,
-    Git,
-    Ram,
-    Cpu,
-    Time,
-    Date,
-    Unknown(String),
-}
+    #[test]
+    fn test_tokenize() {
+        let input = "Hello {name}!";
+        let tokens = tokenize(input);
 
-impl Insert {
-    pub fn from(input: String) -> Insert {
-        match input.as_str() {
-            "cwd" => Insert::CWD,
-            "username" => Insert::Username,
-            "hostname" => Insert::Hostname,
-            "git" => Insert::Git,
-            "ram" => Insert::Ram,
-            "cpu" => Insert::Cpu,
-            "time" => Insert::Time,
-            "date" => Insert::Date,
-            _ => Insert::Unknown(input.clone()),
+        assert_eq!(tokens.len(), 3);
+        match &tokens[0] {
+            Token::Text(t) => assert_eq!(t, "Hello "),
+            _ => panic!("Expected text"),
+        }
+        match &tokens[1] {
+            Token::Placeholder(p) => assert_eq!(p, "name"),
+            _ => panic!("Expected placeholder"),
+        }
+        match &tokens[2] {
+            Token::Text(t) => assert_eq!(t, "!"),
+            _ => panic!("Expected text"),
         }
     }
 
-    pub fn get_value(
-        &self,
-        state: &State,
-        cfg: &ShellConfig,
-    ) -> (String, (ColorValue, ColorValue)) {
-        match self {
-            Insert::CWD => Insert::handle_cwd(state, cfg),
-            Insert::Username => Insert::handle_username(state, cfg),
-            Insert::Hostname => Insert::handle_hostname(state, cfg),
-            Insert::Git => Insert::handle_git(state, cfg),
-            Insert::Ram => Insert::handle_ram(state, cfg),
-            Insert::Cpu => Insert::handle_cpu(state, cfg),
-            Insert::Time => Insert::handle_time(state, cfg),
-            Insert::Date => Insert::handle_date(state, cfg),
-            Insert::Unknown(unknown) => Some((
-                format!("(UNKNOWN INSERT: {})", unknown),
-                (
-                    ColorValue::Named(Color::Red),
-                    ColorValue::Named(Color::Default),
-                ),
-            )),
-        }
-        .unwrap_or((
-            "".to_string(),
-            (
-                ColorValue::Named(Color::White),
-                ColorValue::Named(Color::Default),
-            ),
-        ))
-    }
+    #[test]
 
-    fn handle_cwd(state: &State, cfg: &ShellConfig) -> Option<(String, (ColorValue, ColorValue))> {
-        let config = cfg.segments.get("prompt.cwd").unwrap();
+    fn test_tokenize_nested() {
+        let input = "{a}{b}";
 
-        if !config.enabled {
-            return None;
-        }
+        let tokens = tokenize(input);
 
-        let fg = config.fg.clone();
-        let bg = config.bg.clone();
+        assert_eq!(tokens.len(), 2);
 
-        // todo do it the proper way
-        Some((state.cwd.to_str().unwrap().to_string(), (fg, bg)))
-    }
-    fn handle_username(
-        state: &State,
-        cfg: &ShellConfig,
-    ) -> Option<(String, (ColorValue, ColorValue))> {
-        let config = cfg.segments.get("prompt.username").unwrap();
+        match &tokens[0] {
+            Token::Placeholder(p) => assert_eq!(p, "a"),
 
-        if !config.enabled {
-            return None;
-        }
-
-        let fg = config.fg.clone();
-        let bg = config.bg.clone();
-
-        let format_tokens = tokenize_prompt(&vec![config.format.clone()]);
-
-        // todo do it the proper way
-        Some((state.username.clone(), (fg, bg)))
-    }
-    fn handle_hostname(
-        state: &State,
-        cfg: &ShellConfig,
-    ) -> Option<(String, (ColorValue, ColorValue))> {
-        todo!()
-    }
-    fn handle_git(state: &State, cfg: &ShellConfig) -> Option<(String, (ColorValue, ColorValue))> {
-        todo!()
-    }
-    fn handle_ram(state: &State, cfg: &ShellConfig) -> Option<(String, (ColorValue, ColorValue))> {
-        todo!()
-    }
-    fn handle_cpu(state: &State, cfg: &ShellConfig) -> Option<(String, (ColorValue, ColorValue))> {
-        todo!()
-    }
-    fn handle_time(state: &State, cfg: &ShellConfig) -> Option<(String, (ColorValue, ColorValue))> {
-        todo!()
-    }
-    fn handle_date(state: &State, cfg: &ShellConfig) -> Option<(String, (ColorValue, ColorValue))> {
-        todo!()
-    }
-}
-
-fn tokenize_prompt(lines: &Vec<String>) -> Vec<Token> {
-    let mut out = Vec::new();
-    let mut temp = String::new();
-
-    for (idx, line) in lines.iter().enumerate() {
-        for c in line.chars() {
-            match c {
-                '{' => {
-                    if !temp.is_empty() {
-                        out.push(Token::Text(temp.clone()));
-                        temp.clear();
-                    }
-                }
-                '}' => {
-                    if !temp.is_empty() {
-                        out.push(Token::Value(Insert::from(temp.clone())));
-                        temp.clear();
-                    }
-                }
-                a => temp.push(a),
-            }
-        }
-
-        if !temp.is_empty() {
-            out.push(Token::Text(temp.clone()));
-            temp.clear();
-        }
-
-        if idx != lines.len() - 1 {
-            out.push(Token::NewLine);
+            _ => panic!("Expected placeholder a"),
         }
     }
-
-    out
 }
