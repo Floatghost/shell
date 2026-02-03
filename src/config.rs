@@ -1,89 +1,192 @@
-use std::{collections::HashMap, fs};
+use std::collections::HashMap;
+use std::fs;
 
 use serde::Deserialize;
-
-#[derive(Debug)]
-pub struct ShellConfig {
-    pub theme: ThemeConfig,
-
-    pub prompt: PromptConfig,
-
-    pub segments: HashMap<String, ResolvedSegment>,
-}
-
-impl ShellConfig {
-    pub fn new(filepath: &str) -> Result<ShellConfig, Box<dyn std::error::Error>> {
-        let config = RawShellConfig::new(filepath)?;
-        
-        dbg!(&config);
-        
-        Ok(config.resolve_config())
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct RawShellConfig {
-    pub theme: Option<ThemeConfig>,
-
-    pub prompt: PromptConfig,
-
-    #[serde(flatten)]
-    pub segments: HashMap<String, PromptSegmentConfig>,
-}
 
 pub const BUILTIN_SEGMENTS: &[&str] = &[
     "prompt.time",
     "prompt.date",
     "prompt.cwd",
     "prompt.git",
+    "prompt.cpu",
+    "prompt.ram",
     "prompt.username",
     "prompt.hostname",
 ];
 
-impl RawShellConfig {
-    pub fn new(filepath: &str) -> Result<RawShellConfig, Box<dyn std::error::Error>> {
-        let config: RawShellConfig = toml::from_str(&fs::read_to_string(filepath)?)?;
+#[derive(Debug)]
+pub struct ShellConfig {
+    pub theme: ThemeConfig,
+    pub prompt: PromptConfig,
+    pub segments: HashMap<String, ResolvedSegment>,
+}
 
-        Ok(config)
+impl ShellConfig {
+    pub fn new(filepath: &str) -> Result<ShellConfig, Box<dyn std::error::Error>> {
+        let content = fs::read_to_string(filepath)?;
+        let raw: RawShellConfig = toml::from_str(&content)?;
+        Ok(raw.resolve_config())
     }
+}
 
+#[derive(Deserialize)]
+pub struct RawShellConfig {
+    pub theme: Option<ThemeConfig>,
+    pub prompt: RawPromptConfig,
+}
+
+impl RawShellConfig {
     pub fn resolve_config(self) -> ShellConfig {
         let theme = self.theme.unwrap_or_default();
+        let mut segments = HashMap::new();
 
-        let mut resolved = HashMap::new();
+        let user_flat_segments = self.prompt.to_flat_segments();
 
-        for name in BUILTIN_SEGMENTS {
-            let raw = self.segments.get(*name);
-            let seg = match raw {
-                Some(cfg) => cfg.resolve(name),
-                None => default_segment_for(name),
-            };
-            resolved.insert(name.to_string(), seg);
+        for &name in BUILTIN_SEGMENTS {
+            let defaults = default_segment_for(name);
+            if let Some(user_seg) = user_flat_segments.get(name) {
+                segments.insert(
+                    name.to_string(),
+                    ResolvedSegment {
+                        enabled: user_seg.enabled.unwrap_or(defaults.enabled),
+                        fg: user_seg.fg.clone().unwrap_or(defaults.fg),
+                        bg: user_seg.bg.clone().unwrap_or(defaults.bg),
+                        format: user_seg.format.clone().unwrap_or(defaults.format),
+                    },
+                );
+            } else {
+                segments.insert(name.to_string(), defaults);
+            }
         }
 
-        for (name, raw) in self.segments.iter() {
+        for (name, user_seg) in &user_flat_segments {
             if !BUILTIN_SEGMENTS.contains(&name.as_str()) {
-                resolved.insert(name.clone(), raw.resolve(name));
+                let defaults = default_segment_for(name);
+                segments.insert(
+                    name.clone(),
+                    ResolvedSegment {
+                        enabled: user_seg.enabled.unwrap_or(defaults.enabled),
+                        fg: user_seg.fg.clone().unwrap_or(defaults.fg),
+                        bg: user_seg.bg.clone().unwrap_or(defaults.bg),
+                        format: user_seg.format.clone().unwrap_or(defaults.format),
+                    },
+                );
             }
         }
 
         ShellConfig {
             theme,
-            prompt: self.prompt,
-            segments: resolved,
-        }
-    }
-
-    pub fn resolve_segment(&self, name: &str) -> ResolvedSegment {
-        if let Some(raw) = self.segments.get(name) {
-            raw.resolve(name)
-        } else {
-            default_segment_for(name)
+            prompt: PromptConfig {
+                lines: self.prompt.lines,
+            },
+            segments,
         }
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
+pub struct RawPromptConfig {
+    pub lines: Vec<String>,
+
+    #[serde(flatten)]
+    pub nested_segments: HashMap<String, toml::Value>,
+}
+
+impl RawPromptConfig {
+    pub fn to_flat_segments(&self) -> HashMap<String, PromptSegmentConfig> {
+        let mut map = HashMap::new();
+        for (key, val) in &self.nested_segments {
+            let flat_key = format!("prompt.{}", key);
+
+            if let Ok(seg) = val.clone().try_into::<PromptSegmentConfig>() {
+                map.insert(flat_key, seg);
+            }
+        }
+        map
+    }
+}
+
+#[derive(Debug)]
+pub struct PromptConfig {
+    pub lines: Vec<String>,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct PromptSegmentConfig {
+    pub enabled: Option<bool>,
+    pub fg: Option<ColorValue>,
+    pub bg: Option<ColorValue>,
+    pub format: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ResolvedSegment {
+    pub enabled: bool,
+    pub fg: ColorValue,
+    pub bg: ColorValue,
+    pub format: String,
+}
+
+pub fn default_segment_for(name: &str) -> ResolvedSegment {
+    match name {
+        "prompt.time" => ResolvedSegment {
+            enabled: true,
+            fg: ColorValue::Named(Color::White),
+            bg: ColorValue::Named(Color::Default),
+            format: "{HH}:{MM}:{SS}".to_string(),
+        },
+        "prompt.date" => ResolvedSegment {
+            enabled: true,
+            fg: ColorValue::Named(Color::White),
+            bg: ColorValue::Named(Color::Default),
+            format: "{YYYY}-{MM}-{DD}".to_string(),
+        },
+        "prompt.cwd" => ResolvedSegment {
+            enabled: true,
+            fg: ColorValue::Named(Color::Cyan),
+            bg: ColorValue::Named(Color::Default),
+            format: "{cwd}".to_string(),
+        },
+        "prompt.cpu" => ResolvedSegment {
+            enabled: true,
+            fg: ColorValue::Named(Color::White),
+            bg: ColorValue::Named(Color::Default),
+            format: "{cpu}%".to_string(),
+        },
+        "prompt.ram" => ResolvedSegment {
+            enabled: true,
+            fg: ColorValue::Named(Color::White),
+            bg: ColorValue::Named(Color::Default),
+            format: "{ram}%".to_string(),
+        },
+        "prompt.git" => ResolvedSegment {
+            enabled: true,
+            fg: ColorValue::Named(Color::Magenta),
+            bg: ColorValue::Named(Color::Default),
+            format: "{branch}{dirty}".to_string(),
+        },
+        "prompt.username" => ResolvedSegment {
+            enabled: true,
+            fg: ColorValue::Named(Color::Green),
+            bg: ColorValue::Named(Color::Default),
+            format: "{username}".to_string(),
+        },
+        "prompt.hostname" => ResolvedSegment {
+            enabled: true,
+            fg: ColorValue::Named(Color::Blue),
+            bg: ColorValue::Named(Color::Default),
+            format: "{hostname}".to_string(),
+        },
+        _ => ResolvedSegment {
+            enabled: true,
+            fg: ColorValue::Named(Color::Default),
+            bg: ColorValue::Named(Color::Default),
+            format: "{value}".to_string(),
+        },
+    }
+}
+
+#[derive(Deserialize, Debug)]
 pub struct ThemeConfig {
     pub fg: ColorValue,
     pub bg: ColorValue,
@@ -98,94 +201,7 @@ impl Default for ThemeConfig {
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct PromptConfig {
-    pub lines: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PromptSegmentConfig {
-    pub enabled: Option<bool>,
-    pub fg: Option<ColorValue>,
-    pub bg: Option<ColorValue>,
-    pub format: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ResolvedSegment {
-    pub enabled: bool,
-    pub fg: ColorValue,
-    pub bg: ColorValue,
-    pub format: String,
-}
-
-impl PromptSegmentConfig {
-    pub fn resolve(&self, name: &str) -> ResolvedSegment {
-        let defaults = default_segment_for(name);
-
-        ResolvedSegment {
-            enabled: self.enabled.unwrap_or(defaults.enabled),
-            fg: self.fg.clone().unwrap_or(defaults.fg),
-            bg: self.bg.clone().unwrap_or(defaults.bg),
-            format: self.format.clone().unwrap_or(defaults.format),
-        }
-    }
-}
-
-pub fn default_segment_for(name: &str) -> ResolvedSegment {
-    match name {
-        "prompt.time" => ResolvedSegment {
-            enabled: true,
-            fg: ColorValue::Named(Color::White),
-            bg: ColorValue::Named(Color::Default),
-            format: "{HH}:{MM}:{SS}".into(),
-        },
-
-        "prompt.date" => ResolvedSegment {
-            enabled: false,
-            fg: ColorValue::Named(Color::White),
-            bg: ColorValue::Named(Color::Default),
-            format: "{YYYY}-{MM}-{DD}".into(),
-        },
-
-        "prompt.cwd" => ResolvedSegment {
-            enabled: true,
-            fg: ColorValue::Named(Color::Cyan),
-            bg: ColorValue::Named(Color::Default),
-            format: "{cwd}".into(),
-        },
-
-        "prompt.git" => ResolvedSegment {
-            enabled: false,
-            fg: ColorValue::Named(Color::Magenta),
-            bg: ColorValue::Named(Color::Default),
-            format: "{branch}{dirty}".into(),
-        },
-
-        "prompt.username" => ResolvedSegment {
-            enabled: true,
-            fg: ColorValue::Named(Color::Green),
-            bg: ColorValue::Named(Color::Default),
-            format: "{username}".into(),
-        },
-
-        "prompt.hostname" => ResolvedSegment {
-            enabled: true,
-            fg: ColorValue::Named(Color::Blue),
-            bg: ColorValue::Named(Color::Default),
-            format: "{hostname}".into(),
-        },
-
-        _ => ResolvedSegment {
-            enabled: true,
-            fg: ColorValue::Named(Color::Default),
-            bg: ColorValue::Named(Color::Default),
-            format: "{value}".into(),
-        },
-    }
-}
-
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum ColorValue {
     Named(Color),
@@ -195,20 +211,26 @@ pub enum ColorValue {
 impl ColorValue {
     pub fn to_ansi_fg(&self) -> String {
         match self {
-            ColorValue::Named(c) => c.to_ansi_fg().into(),
-            ColorValue::Hex(h) => hex_to_ansi_fg(h),
+            ColorValue::Named(c) => c.to_ansi_fg().to_string(),
+            ColorValue::Hex(h) => {
+                let (r, g, b) = parse_hex(h);
+                format!("\x1b[38;2;{};{};{}m", r, g, b)
+            }
         }
     }
 
     pub fn to_ansi_bg(&self) -> String {
         match self {
-            ColorValue::Named(c) => c.to_ansi_bg().into(),
-            ColorValue::Hex(h) => hex_to_ansi_bg(h),
+            ColorValue::Named(c) => c.to_ansi_bg().to_string(),
+            ColorValue::Hex(h) => {
+                let (r, g, b) = parse_hex(h);
+                format!("\x1b[48;2;{};{};{}m", r, g, b)
+            }
         }
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Color {
     Black,
@@ -252,25 +274,14 @@ impl Color {
     }
 }
 
-fn hex_to_ansi_fg(hex: &str) -> String {
-    let rgb = parse_hex_color(hex);
-    format!("\x1b[38;2;{};{};{}m", rgb.0, rgb.1, rgb.2)
-}
-
-fn hex_to_ansi_bg(hex: &str) -> String {
-    let rgb = parse_hex_color(hex);
-    format!("\x1b[48;2;{};{};{}m", rgb.0, rgb.1, rgb.2)
-}
-
-fn parse_hex_color(hex: &str) -> (u8, u8, u8) {
-    let clean = hex.trim_start_matches('#');
-    if clean.len() != 6 {
-        return (255, 255, 255);
+fn parse_hex(hex: &str) -> (u8, u8, u8) {
+    let hex = hex.trim_start_matches('#');
+    if hex.len() == 6 {
+        let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
+        let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
+        let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
+        (r, g, b)
+    } else {
+        (0, 0, 0)
     }
-
-    let r = u8::from_str_radix(&clean[0..2], 16).unwrap_or(255);
-    let g = u8::from_str_radix(&clean[2..4], 16).unwrap_or(255);
-    let b = u8::from_str_radix(&clean[4..6], 16).unwrap_or(255);
-
-    (r, g, b)
 }

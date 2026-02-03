@@ -4,9 +4,15 @@ bg = "default"
 
 [prompt]
 lines = [
-    "{cwd} -> "
+    "{username} {cwd} -> ",
 ]
 
 [prompt.cwd]
 enabled = true
 fg = "magenta"
+format = "{cwd} lululul"
+
+[prompt.username]
+enabled = true
+fg = "yellow"
+format = "👑{username}👑"
