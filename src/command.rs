@@ -1,7 +1,6 @@
 use std::{
-    collections::HashMap,
     env,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::Stdio,
 };
 
@@ -72,7 +71,11 @@ impl Command {
                         todo!()
                     }
                     BuiltIn::Cd => {
-                        state.cd(&self.args[1]);
+                        state.cd(&self.args[0]).unwrap();
+                        None
+                    }
+                    BuiltIn::PWD => {
+                        println!("PWD: {}", state.cwd.to_str().unwrap());
                         None
                     }
                 }
@@ -139,13 +142,15 @@ pub fn find_in_path(bin_name: &str) -> Option<PathBuf> {
 pub enum BuiltIn {
     Exit,
     Cd,
+    PWD, // print working dir
 }
 
 pub static BUILTIN_COMMANDS: phf::Map<&'static str, BuiltIn> = phf_map! {
     "exit" => BuiltIn::Exit,
     "cd"   => BuiltIn::Cd,
+    "pwd" => BuiltIn::PWD,
 };
 
 pub fn find_in_builtin(bin_name: &str) -> Option<&BuiltIn> {
-    BUILTIN_COMMANDS.get(bin_name)
+    BUILTIN_COMMANDS.get(&bin_name.to_lowercase())
 }
