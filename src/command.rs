@@ -1,3 +1,4 @@
+/*
 use std::{env, fs, path::PathBuf, process::Stdio};
 
 use phf::phf_map;
@@ -25,7 +26,7 @@ impl Command {
         }
         if let Some(path) = find_in_path(&exec) {
             return Some(Command {
-                runner: Runner::Executable { path: path },
+                runner: path,
                 args: args.to_vec(),
             });
         }
@@ -228,3 +229,4 @@ pub fn find_in_builtin(bin_name: &str) -> Option<Runner> {
         BUILTIN_COMMANDS.get(&bin_name.to_lowercase())?.clone(),
     ))
 }
+*/

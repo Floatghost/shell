@@ -1,3 +1,4 @@
+/*
 use std::collections::HashMap;
 use std::io::Write;
 
@@ -6,7 +7,7 @@ use sysinfo::System;
 
 use crate::{
     app::State,
-    config::{ColorValue, ShellConfig},
+    // config::{ColorValue, ShellConfig},
 };
 
 pub fn render_prompt(state: &State, cfg: &ShellConfig) {
@@ -289,3 +290,4 @@ mod tests {
         }
     }
 }
+*/
