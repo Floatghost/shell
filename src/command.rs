@@ -118,7 +118,28 @@ impl Command {
                     None
                 }
                 BuiltIn::Where => {
-                    todo!()
+                    let query = match Command::new(&self.args[0], &self.args[1..]) {
+                        Some(com) => com,
+                        None => return Some(1),
+                    };
+
+                    match query.runner {
+                        Runner::Executable { path } => {
+                            println!("exe @ {}", path.to_str().unwrap());
+                        }
+                        Runner::InBuilt(b) => {
+                            println!("builtin command: {:?}", b);
+                        }
+                        Runner::Interpreted { path, executor } => {
+                            println!(
+                                "{} interpreted by {}",
+                                path.to_str().unwrap(),
+                                executor.to_str().unwrap()
+                            );
+                        }
+                    }
+
+                    None
                 }
             },
         }
@@ -148,7 +169,7 @@ pub fn find_in_env(bin_name: &str) -> Option<PathBuf> {
         };
 
         if full_path.is_file() {
-            println!("Found binary at: {}", full_path.display());
+            // println!("Found binary at: {}", full_path.display());
             return Some(full_path);
         }
     }
