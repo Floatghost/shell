@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.43"
+crossterm = "0.29.0"
 phf = { version = "0.13.1", features = ["macros"] }
 serde = { version = "1.0.228", features = ["derive"] }
 sysinfo = "0.38.0"
