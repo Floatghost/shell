@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::process::Command;
-use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
+use sysinfo::System;
 
 pub struct GitInfo {
     pub branch: String,
@@ -22,11 +22,7 @@ impl State {
                 Err(_) => "user".into(),
             },
             cwd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
-            system: System::new_with_specifics(
-                RefreshKind::nothing()
-                    .with_cpu(CpuRefreshKind::everything())
-                    .with_memory(MemoryRefreshKind::everything()),
-            ),
+            system: System::new(),
             git: None,
         }
     }
@@ -38,7 +34,8 @@ impl State {
     }
 
     pub fn refresh(&mut self) {
-        self.system.refresh_all();
+        self.system.refresh_cpu_usage();
+        self.system.refresh_memory();
 
         self.git = self.get_git_info();
     }
