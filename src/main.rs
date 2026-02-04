@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io;
 mod parse_input;
 use parse_input::*;
 mod app;
