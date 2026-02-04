@@ -1,23 +1,33 @@
 use std::io;
 mod parse_input;
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use parse_input::*;
 mod app;
-mod command;
-mod config;
+// mod command;
+// mod config;
 mod execute;
 mod render;
+mod userinput;
 
 use crate::{
     app::State,
-    command::{BuiltIn, Command, Runner},
-    config::ShellConfig,
-    render::render_prompt,
+    // command::{BuiltIn, Command, Runner},
+    // config::ShellConfig,
+    // render::render_prompt,
 };
 
 fn main() {
-    let mut state = State::new();
-    let config = ShellConfig::new("./shell.toml").unwrap();
+    // let mut state = State::new();
+    // let config = ShellConfig::new("./shell.toml").unwrap();
 
+    enable_raw_mode().unwrap();
+
+    userinput::get_userinput();
+
+    disable_raw_mode();
+
+    return;
+    /*
     loop {
         state.refresh();
         render_prompt(&state, &config);
@@ -49,4 +59,6 @@ fn main() {
             println!("could not find \"{}\"", &exec);
         }
     }
+
+    disable_raw_mode();*/
 }
