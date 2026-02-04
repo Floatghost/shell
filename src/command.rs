@@ -1,8 +1,4 @@
-use std::{
-    env,
-    path::PathBuf,
-    process::Stdio,
-};
+use std::{env, fs, path::PathBuf, process::Stdio};
 
 use phf::phf_map;
 
@@ -65,21 +61,66 @@ impl Command {
             Runner::Interpreted { path, executor } => {
                 todo!()
             }
-            Runner::InBuilt(com) => {
-                match com {
-                    BuiltIn::Exit => {
-                        todo!()
-                    }
-                    BuiltIn::Cd => {
-                        state.cd(&self.args[0]).unwrap();
-                        None
-                    }
-                    BuiltIn::PWD => {
-                        println!("PWD: {}", state.cwd.to_str().unwrap());
-                        None
-                    }
+            Runner::InBuilt(com) => match com {
+                BuiltIn::Exit => {
+                    todo!()
                 }
-            }
+                BuiltIn::Cd => {
+                    state.cd(&self.args[0]).unwrap();
+                    None
+                }
+                BuiltIn::PWD => {
+                    println!("PWD: {}", state.cwd.to_str().unwrap());
+                    None
+                }
+                BuiltIn::Ls => {
+                    use chrono::Local;
+                    use std::fs;
+
+                    println!(
+                        "{:<6}  {:<15}  {:>8}  {}",
+                        "Mode", "LastWriteTime", "Length", "Name"
+                    );
+                    println!(
+                        "{:<6}  {:<15}  {:>8}  {}",
+                        "----", "-------------", "------", "----"
+                    );
+
+                    for entry in fs::read_dir(&state.cwd).unwrap() {
+                        let Ok(entry) = entry else { continue };
+                        let Ok(metadata) = entry.metadata() else {
+                            continue;
+                        };
+
+                        let is_dir = metadata.is_dir();
+                        let entry_name = entry.file_name();
+                        let name = entry_name.to_string_lossy();
+
+                        let mode = if is_dir { "d-----" } else { "-a----" };
+
+                        let modified = metadata.modified().ok();
+                        let time_string = modified
+                            .and_then(|t| {
+                                let dt = chrono::DateTime::<Local>::from(t);
+                                Some(dt.format("%-d/%-m/%Y  %H:%M").to_string())
+                            })
+                            .unwrap_or_else(|| "".into());
+
+                        let length = if is_dir {
+                            "".into()
+                        } else {
+                            metadata.len().to_string()
+                        };
+
+                        println!("{:<6}  {:<15}  {:>8}  {}", mode, time_string, length, name);
+                    }
+
+                    None
+                }
+                BuiltIn::Where => {
+                    todo!()
+                }
+            },
         }
     }
 }
@@ -143,12 +184,16 @@ pub enum BuiltIn {
     Exit,
     Cd,
     PWD, // print working dir
+    Ls,
+    Where,
 }
 
 pub static BUILTIN_COMMANDS: phf::Map<&'static str, BuiltIn> = phf_map! {
     "exit" => BuiltIn::Exit,
     "cd"   => BuiltIn::Cd,
     "pwd" => BuiltIn::PWD,
+    "ls" => BuiltIn::Ls,
+    "where" => BuiltIn::Where,
 };
 
 pub fn find_in_builtin(bin_name: &str) -> Option<&BuiltIn> {

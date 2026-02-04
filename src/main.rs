@@ -41,7 +41,7 @@ fn main() {
             }
 
             let return_code = command.exec(&mut state);
-            println!("{:?}", return_code);
+            // println!("{:?}", return_code);
         }
     }
 }
