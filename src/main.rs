@@ -3,43 +3,44 @@ mod parse_input;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use parse_input::*;
 mod app;
-// mod command;
-// mod config;
+mod command;
+mod config;
 mod execute;
 mod render;
 mod userinput;
 
 use crate::{
     app::State,
-    // command::{BuiltIn, Command, Runner},
-    // config::ShellConfig,
-    // render::render_prompt,
+    command::{BuiltIn, Command, Runner},
+    config::ShellConfig, userinput::get_userinput,
+    render::render_prompt,
 };
 
 fn main() {
-    // let mut state = State::new();
-    // let config = ShellConfig::new("./shell.toml").unwrap();
+    let mut state = State::new();
+    let config = ShellConfig::new("./shell.toml").unwrap();
+
+    let exit = ExitStrat;
 
     enable_raw_mode().unwrap();
 
-    userinput::get_userinput();
+    userinput::get_userinput(&state, &config);
 
-    disable_raw_mode();
 
-    return;
-    /*
     loop {
         state.refresh();
         render_prompt(&state, &config);
 
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
+        let input = match get_userinput(&state, &config) {
+            Some(n) => n,
+            None => continue,
+        };
 
-        let tokens = tokenize(input.trim());
-        if tokens.is_empty() {
+        if input.is_empty() {
             continue;
         }
 
+        /*
         let exec = &tokens[0];
         let args = &tokens[1..];
 
@@ -58,7 +59,14 @@ fn main() {
         } else {
             println!("could not find \"{}\"", &exec);
         }
+        */
     }
+}
 
-    disable_raw_mode();*/
+struct ExitStrat;
+
+impl Drop for ExitStrat {
+    fn drop(&mut self) {
+        disable_raw_mode();
+    }
 }
