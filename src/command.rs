@@ -1,4 +1,3 @@
-/*
 use std::{env, fs, path::PathBuf, process::Stdio};
 
 use phf::phf_map;
@@ -170,7 +169,7 @@ pub fn find_in_env(bin_name: &str) -> Option<PathBuf> {
             }
         };
 
-        if full_path.is_file() && full_path.extension().unwrap().to_str().unwrap() = "exe" {
+        if full_path.is_file() && full_path.extension().unwrap().to_str().unwrap() == "exe" {
             return Some(full_path);
         }
     }
@@ -194,8 +193,8 @@ pub fn find_in_path(bin_name: &str) -> Option<Runner> {
 
     if full_path.is_file() {
         match full_path.extension().unwrap().to_str().unwrap() {
-            "exe" => Some(full_path),
-            inter if => {
+            "exe" => Some(Runner::Executable { path: full_path }),
+            inter => {
                 // allow the user to pass interpreters and an regex match
                 // and then pass all files to the interpreters if they just get called as an path
                 todo!()
@@ -229,4 +228,3 @@ pub fn find_in_builtin(bin_name: &str) -> Option<Runner> {
         BUILTIN_COMMANDS.get(&bin_name.to_lowercase())?.clone(),
     ))
 }
-*/
