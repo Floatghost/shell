@@ -17,19 +17,19 @@ pub enum Runner {
 
 impl Command {
     pub fn new(exec: &str, args: &[String]) -> Option<Command> {
-        if let Some(com) = find_in_builtin(&exec) {
+        if let Some(run) = find_in_builtin(&exec) {
             return Some(Command {
-                runner: Runner::InBuilt(com.clone()),
+                runner: run,
                 args: args.to_vec(),
             });
         }
-        if let Some(path) = find_in_env(&exec) {
+        if let Some(path) = find_in_path(&exec) {
             return Some(Command {
                 runner: Runner::Executable { path: path },
                 args: args.to_vec(),
             });
         }
-        if let Some(path) = find_in_path(&exec) {
+        if let Some(path) = find_in_env(&exec) {
             return Some(Command {
                 runner: Runner::Executable { path: path },
                 args: args.to_vec(),
@@ -146,6 +146,8 @@ impl Command {
     }
 }
 
+/// find_in_env never returns an interpreted since there may be garbage in the path since
+/// programs dont expect the shell to just exec random files
 pub fn find_in_env(bin_name: &str) -> Option<PathBuf> {
     let path_var = match env::var("PATH") {
         Ok(val) => val,
@@ -158,7 +160,6 @@ pub fn find_in_env(bin_name: &str) -> Option<PathBuf> {
     for dir in env::split_paths(&path_var) {
         let full_path = dir.join(&bin_name);
 
-        // On Windows, executables may need ".exe" appended
         #[cfg(windows)]
         let full_path = {
             if full_path.extension().is_none() {
@@ -168,22 +169,19 @@ pub fn find_in_env(bin_name: &str) -> Option<PathBuf> {
             }
         };
 
-        if full_path.is_file() {
-            // println!("Found binary at: {}", full_path.display());
+        if full_path.is_file() && full_path.extension().unwrap().to_str().unwrap() = "exe" {
             return Some(full_path);
         }
     }
 
-    println!("Binary '{}' not found in PATH", bin_name);
     None
 }
 
-pub fn find_in_path(bin_name: &str) -> Option<PathBuf> {
+pub fn find_in_path(bin_name: &str) -> Option<Runner> {
     let current_dir = env::current_dir().unwrap();
 
     let full_path = current_dir.join(&bin_name);
 
-    // On Windows, executables may need ".exe" appended
     #[cfg(windows)]
     let full_path = {
         if full_path.extension().is_none() {
@@ -194,7 +192,15 @@ pub fn find_in_path(bin_name: &str) -> Option<PathBuf> {
     };
 
     if full_path.is_file() {
-        Some(full_path)
+        match full_path.extension().unwrap().to_str().unwrap() {
+            "exe" => Some(full_path),
+            inter if => {
+                // allow the user to pass interpreters and an regex match
+                // and then pass all files to the interpreters if they just get called as an path
+                todo!()
+            }
+            _ => None,
+        }
     } else {
         None
     }
@@ -217,6 +223,8 @@ pub static BUILTIN_COMMANDS: phf::Map<&'static str, BuiltIn> = phf_map! {
     "where" => BuiltIn::Where,
 };
 
-pub fn find_in_builtin(bin_name: &str) -> Option<&BuiltIn> {
-    BUILTIN_COMMANDS.get(&bin_name.to_lowercase())
+pub fn find_in_builtin(bin_name: &str) -> Option<Runner> {
+    Some(Runner::InBuilt(
+        BUILTIN_COMMANDS.get(&bin_name.to_lowercase())?.clone(),
+    ))
 }

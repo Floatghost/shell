@@ -30,7 +30,10 @@ fn main() {
             continue;
         }
 
-        let internal_command = Command::new(&tokens[0], &tokens[1..]);
+        let exec = &tokens[0];
+        let args = &tokens[1..];
+
+        let internal_command = Command::new(&exec, args);
 
         if let Some(command) = internal_command {
             if let Runner::InBuilt(com) = &command.runner {
@@ -42,6 +45,8 @@ fn main() {
 
             let return_code = command.exec(&mut state);
             // println!("{:?}", return_code);
+        } else {
+            println!("could not find \"{}\"", &exec);
         }
     }
 }
