@@ -1,4 +1,4 @@
-use std::{env, fs, path::PathBuf, process::Stdio};
+use std::{env, path::PathBuf, process::Stdio};
 
 use phf::phf_map;
 
@@ -9,6 +9,8 @@ pub struct Command {
     pub args: Vec<String>,
 }
 
+#[allow(unused)]
+#[derive(Debug, Clone)]
 pub enum Runner {
     Executable { path: PathBuf },
     Interpreted { path: PathBuf, executor: PathBuf },
@@ -39,6 +41,7 @@ impl Command {
         None
     }
 
+    #[allow(unused)]
     pub fn exec(&self, state: &mut State) -> Option<i32> {
         match &self.runner {
             Runner::Executable { path } => {
@@ -191,6 +194,7 @@ pub fn find_in_path(bin_name: &str) -> Option<Runner> {
         }
     };
 
+    #[allow(unused)]
     if full_path.is_file() {
         match full_path.extension().unwrap().to_str().unwrap() {
             "exe" => Some(Runner::Executable { path: full_path }),
