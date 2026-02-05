@@ -1,5 +1,8 @@
 use std::collections::HashMap;
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::PathBuf;
+use std::slice::GetDisjointMutError;
 
 use serde::Deserialize;
 
@@ -21,11 +24,37 @@ pub struct ShellConfig {
     pub segments: HashMap<String, ResolvedSegment>,
 }
 
+const DEFAULT_CONF: &str = include_str!("../shell.toml");
+
 impl ShellConfig {
-    pub fn new(filepath: &str) -> Result<ShellConfig, Box<dyn std::error::Error>> {
-        let content = fs::read_to_string(filepath)?;
+    pub fn new() -> Result<ShellConfig, Box<dyn std::error::Error>> {
+        let filepath = ShellConfig::config_path();
+        let content = match fs::read_to_string(&filepath) {
+            Ok(c) => c,
+            Err(e) => ShellConfig::generate_default_conf(&filepath)?,
+        };
         let raw: RawShellConfig = toml::from_str(&content)?;
         Ok(raw.resolve_config())
+    }
+
+    fn generate_default_conf(filepath: &PathBuf) -> std::io::Result<String> {
+        let contents = DEFAULT_CONF.to_string();
+
+        if let Some(parent) = filepath.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let mut file = fs::File::create(&filepath)?;
+        file.write_all(contents.as_bytes())?;
+
+        Ok(contents)
+    }
+    pub fn config_path() -> std::path::PathBuf {
+        let appdata = std::env::var("APPDATA").expect("%APPDATA% not set (this is Windows-only)");
+
+        std::path::PathBuf::from(appdata)
+            .join("LeVimShell")
+            .join("shell.toml")
     }
 }
 
