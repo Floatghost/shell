@@ -24,7 +24,6 @@ pub fn tokenize(input: &str) -> Vec<Token> {
 
     for c in input.chars() {
         if c == '\n' {
-            // finalize token before newline
             if !temp.raw.is_empty() {
                 out.push(temp);
                 temp = Token::new(0, offset_y + 1);
@@ -38,7 +37,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
         if c.is_whitespace() {
             if !temp.raw.is_empty() {
                 out.push(temp);
-                temp = Token::new(offset_x, offset_y);
+                temp = Token::new(offset_x + 1, offset_y);
             }
         } else {
             temp.raw.push(c);
