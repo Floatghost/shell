@@ -62,6 +62,43 @@ pub fn complete_command(prefix: &str) -> Vec<Found> {
     out
 }
 
+pub fn complete_path(prefix: &str) -> Vec<Found> {
+    // convert all "\" to "/"
+    let clean_prefix: String = prefix.chars().map(|c| if c == '\\' {'/'} else {c}).collect();
+
+    let path = if clean_prefix.to_lowercase().starts_with("c:") {
+        // for every new / extend the path if this fails but we arent in the last / jet discard
+        let mut potential_path = PathBuf::from("C:\\");
+        let parts: Vec<&str> = clean_prefix.split("/").skip(1).collect(); // skip C:\
+
+        for part in parts {
+            // work here
+        }
+    } else {
+
+    };
+
+    // check if starts with an drive letter and ":"
+    //
+    // otherwise check in local dir
+
+    // create path to the dir
+
+    // loop through the dir
+
+// todo get drive letters
+    println!("complete path");
+    let path = if prefix.to_lowercase().starts_with("c:") {
+        println!("drive");
+    } else if prefix.starts_with("./") || prefix.starts_with(".\\") {
+
+    } else {
+
+    }
+
+    todo!()
+}
+
 #[allow(unused)]
 pub fn find_in_local(state: &State) -> std::io::Result<Vec<Found>> {
     let entrys = std::fs::read_dir(state.cwd.clone())?;
