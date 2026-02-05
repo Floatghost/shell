@@ -13,6 +13,7 @@ use crate::{
     app::State,
     command::{BuiltIn, Command, Runner},
     config::ShellConfig,
+    parse_input::tokenize,
     readline::ReadLine,
     render::render_prompt,
 };
@@ -39,7 +40,8 @@ fn main() {
             },
         };
 
-        /*
+        let tokens = tokenize(&userinput);
+
         let exec = &tokens[0];
         let args = &tokens[1..];
 
@@ -58,7 +60,6 @@ fn main() {
         } else {
             println!("could not find \"{}\"", &exec);
         }
-        */
     }
 }
 

@@ -14,6 +14,7 @@ use crate::{
     userinput::{Token, tokenize},
 };
 
+#[derive(Debug)]
 pub struct ReadLine {
     cursor_x: u16,
     start_pos: (u16, u16),
@@ -76,6 +77,9 @@ impl ReadLine {
                                         continue;
                                     }
 
+                                    // println!();
+                                    // dbg!(&tokens);
+
                                     // if the cursor is on a token or just after it start with autocomplete
                                     let focused = self.get_focused_token(&tokens);
 
@@ -99,17 +103,25 @@ impl ReadLine {
                                             },
                                         );
                                     } else {
-                                        println!();
-                                        for result in results {
-                                            println!("Found: {}", result.file_name());
-                                        }
-                                        return Ok(self.buffer.clone());
+                                        results.sort_by(|a, b| {
+                                            a.file_name().len().cmp(&b.file_name().len())
+                                        });
+                                        self.overwrite_token(
+                                            &focused,
+                                            match &results[0] {
+                                                Found::Path(p) => p.to_str().unwrap(),
+                                                Found::EnvPath(envp) => {
+                                                    envp.file_name().unwrap().to_str().unwrap()
+                                                }
+                                            },
+                                        );
                                     }
 
                                     // other wise dont do anything
                                 }
                                 KeyCode::Enter => {
-                                    break;
+                                    println!();
+                                    return Ok(self.buffer.clone());
                                 }
                                 KeyCode::Char(c) => {
                                     if modifiers.contains(KeyModifiers::CONTROL) {
@@ -161,7 +173,7 @@ impl ReadLine {
                         }
                     }
                     event => {
-                        println!("event: {:?}", event);
+                        // println!("event: {:?}", event);
                     }
                 }
             }
@@ -234,14 +246,29 @@ impl ReadLine {
     }
 
     fn get_focused_token(&self, tokens: &[Token]) -> Token {
+        let cx = self.cursor_x as usize;
+
         for token in tokens {
-            if token.offset_x <= self.cursor_x as u32
-                && token.offset_x as usize + token.raw.len() >= self.cursor_x as usize
-            {
+            let start = token.offset_x as usize;
+            let end = start + token.raw.len();
+
+            if cx >= start && cx <= end {
                 return token.clone();
             }
         }
-        unreachable!();
+
+        if cx == self.buffer.len() {
+            if let Some(last) = tokens.last() {
+                println!("in saftey");
+                return last.clone();
+            }
+        }
+
+        Token {
+            raw: "".to_string(),
+            offset_x: cx as u32,
+            offset_y: 0,
+        }
     }
 
     fn overwrite_token(&mut self, t: &Token, replacing: &str) {
@@ -251,7 +278,6 @@ impl ReadLine {
         let old_len = t.raw.len();
         let new_len = replacing.len();
 
-        // Step 1: rebuild buffer
         self.buffer = format!(
             "{}{}{}",
             &self.buffer[..start],
@@ -259,7 +285,6 @@ impl ReadLine {
             &self.buffer[end..],
         );
 
-        // Step 2: move to start of token in terminal
         let mut out = stdout();
         out.queue(cursor::MoveTo(
             self.start_pos.0 + start as u16,
@@ -267,16 +292,13 @@ impl ReadLine {
         ))
         .unwrap();
 
-        // Step 3: print everything from the replacement to the end of buffer
         out.queue(style::Print(&self.buffer[start..])).unwrap();
 
-        // Step 4: if replacement is shorter than original token, clear leftover characters
         if new_len < old_len {
             let diff = old_len - new_len;
             out.queue(style::Print(" ".repeat(diff))).unwrap();
         }
 
-        // Step 5: restore cursor to proper position (end of replacement)
         let new_cursor = start + new_len;
         self.cursor_x = new_cursor as u16;
 
