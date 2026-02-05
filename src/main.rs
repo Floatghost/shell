@@ -20,7 +20,7 @@ use crate::{
 
 fn main() {
     let mut state = State::new();
-    let config = ShellConfig::new("./shell.toml").unwrap();
+    let config = ShellConfig::new().unwrap();
 
     enable_raw_mode().unwrap();
     let _ = ExitStrat;
