@@ -19,21 +19,21 @@ pub enum Runner {
 
 impl Command {
     pub fn new(exec: &str, args: &[String]) -> Option<Command> {
-        if let Some(run) = find_in_builtin(&exec) {
+        if let Some(run) = find_in_builtin(exec) {
             return Some(Command {
                 runner: run,
                 args: args.to_vec(),
             });
         }
-        if let Some(path) = find_in_path(&exec) {
+        if let Some(path) = find_in_path(exec) {
             return Some(Command {
                 runner: path,
                 args: args.to_vec(),
             });
         }
-        if let Some(path) = find_in_env(&exec) {
+        if let Some(path) = find_in_env(exec) {
             return Some(Command {
-                runner: Runner::Executable { path: path },
+                runner: Runner::Executable { path },
                 args: args.to_vec(),
             });
         }
@@ -103,9 +103,9 @@ impl Command {
 
                         let modified = metadata.modified().ok();
                         let time_string = modified
-                            .and_then(|t| {
+                            .map(|t| {
                                 let dt = chrono::DateTime::<Local>::from(t);
-                                Some(dt.format("%-d/%-m/%Y  %H:%M").to_string())
+                                dt.format("%-d/%-m/%Y  %H:%M").to_string()
                             })
                             .unwrap_or_else(|| "".into());
 
@@ -161,7 +161,7 @@ pub fn find_in_env(bin_name: &str) -> Option<PathBuf> {
     };
 
     for dir in env::split_paths(&path_var) {
-        let full_path = dir.join(&bin_name);
+        let full_path = dir.join(bin_name);
 
         #[cfg(windows)]
         let full_path = {
@@ -183,7 +183,7 @@ pub fn find_in_env(bin_name: &str) -> Option<PathBuf> {
 pub fn find_in_path(bin_name: &str) -> Option<Runner> {
     let current_dir = env::current_dir().unwrap();
 
-    let full_path = current_dir.join(&bin_name);
+    let full_path = current_dir.join(bin_name);
 
     #[cfg(windows)]
     let full_path = {

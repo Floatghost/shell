@@ -1,10 +1,9 @@
 pub fn tokenize(input: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
-    let mut chars = input.chars().peekable();
     let mut current = String::new();
     let mut in_quotes: Option<char> = None;
 
-    while let Some(c) = chars.next() {
+    for c in input.chars() {
         match c {
             ' ' if in_quotes.is_none() => {
                 if !current.is_empty() {

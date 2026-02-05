@@ -47,15 +47,15 @@ fn main() {
         let exec = &tokens[0];
         let args = &tokens[1..];
 
-        let internal_command = Command::new(&exec, args);
+        let internal_command = Command::new(exec, args);
 
         if let Some(command) = internal_command {
-            if let Runner::InBuilt(com) = &command.runner {
-                if com == &BuiltIn::Exit {
-                    print!("\x1b[0m");
-                    println!("return {:?}", return_code);
-                    break;
-                }
+            if let Runner::InBuilt(com) = &command.runner
+                && com == &BuiltIn::Exit
+            {
+                print!("\x1b[0m");
+                println!("return {:?}", return_code);
+                break;
             }
 
             return_code = command.exec(&mut state);

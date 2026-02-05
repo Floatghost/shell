@@ -75,7 +75,7 @@ impl ReadLine {
                                     // parse buffer and give back tokens + their offsets
                                     let tokens = tokenize(&self.buffer);
 
-                                    if tokens.len() == 0 {
+                                    if tokens.is_empty() {
                                         continue;
                                     }
 
@@ -257,11 +257,11 @@ impl ReadLine {
             }
         }
 
-        if cx == self.buffer.len() {
-            if let Some(last) = tokens.last() {
-                println!("in saftey");
-                return last.clone();
-            }
+        if cx == self.buffer.len()
+            && let Some(last) = tokens.last()
+        {
+            println!("in saftey");
+            return last.clone();
         }
 
         Token {
