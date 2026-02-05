@@ -34,7 +34,6 @@ fn construct_prompt(state: &State, cfg: &ShellConfig) -> String {
                 Token::Placeholder(key) => {
                     if let Some((text, (fg, bg))) = render_segment_by_name(&key, state, cfg) {
                         blocks.push(&text, fg, bg);
-                    } else {
                     }
                 }
             }

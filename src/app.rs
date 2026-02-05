@@ -61,8 +61,7 @@ impl State {
         }
 
         let branch_line = lines[0];
-        let branch = if branch_line.starts_with("## ") {
-            let raw = &branch_line[3..];
+        let branch = if let Some(raw) = branch_line.strip_prefix("## ") {
             if let Some(idx) = raw.find("...") {
                 raw[..idx].to_string()
             } else {
