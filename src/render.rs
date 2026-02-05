@@ -9,7 +9,7 @@ use crate::{
     config::{ColorValue, ShellConfig},
 };
 
-pub fn render_prompt(state: &State, cfg: &ShellConfig) {
+pub fn render_prompt(state: &State, cfg: &ShellConfig) -> String {
     let prompt = construct_prompt(state, cfg);
 
     print!("{}", prompt);
@@ -17,6 +17,7 @@ pub fn render_prompt(state: &State, cfg: &ShellConfig) {
     print!("\x1b[0m");
 
     std::io::stdout().flush().unwrap();
+    prompt
 }
 
 fn construct_prompt(state: &State, cfg: &ShellConfig) -> String {

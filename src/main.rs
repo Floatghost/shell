@@ -1,18 +1,19 @@
-use std::io;
 mod parse_input;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use parse_input::*;
 mod app;
 mod command;
 mod config;
 mod execute;
+mod find;
+mod readline;
 mod render;
 mod userinput;
 
 use crate::{
     app::State,
     command::{BuiltIn, Command, Runner},
-    config::ShellConfig, userinput::get_userinput,
+    config::ShellConfig,
+    readline::ReadLine,
     render::render_prompt,
 };
 
@@ -20,25 +21,23 @@ fn main() {
     let mut state = State::new();
     let config = ShellConfig::new("./shell.toml").unwrap();
 
-    let exit = ExitStrat;
-
     enable_raw_mode().unwrap();
-
-    userinput::get_userinput(&state, &config);
-
+    let exit = ExitStrat;
 
     loop {
         state.refresh();
-        render_prompt(&state, &config);
+        let prompt = render_prompt(&state, &config);
 
-        let input = match get_userinput(&state, &config) {
-            Some(n) => n,
-            None => continue,
+        let last_prompt_line = prompt.lines().last().unwrap();
+
+        let mut readline = ReadLine::new(last_prompt_line);
+        let userinput = match readline.get_line() {
+            Ok(n) => n,
+            Err(e) => match e.as_str() {
+                "ctrl-c" => return,
+                _ => panic!("ERROR: {}", e),
+            },
         };
-
-        if input.is_empty() {
-            continue;
-        }
 
         /*
         let exec = &tokens[0];
@@ -67,6 +66,6 @@ struct ExitStrat;
 
 impl Drop for ExitStrat {
     fn drop(&mut self) {
-        disable_raw_mode();
+        disable_raw_mode().unwrap();
     }
 }

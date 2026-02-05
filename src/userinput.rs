@@ -1,66 +1,55 @@
-use std::{io::Write, path::PathBuf, time::Duration};
-
-use crossterm::{
-    cursor::position,
-    event::{poll, read, Event, KeyCode, KeyEvent},
-};
-
-use crate::{app::State, config::ShellConfig};
-
-pub enum UserInput {
-    Path(PathBuf),
-    Ident(String),
-    Args(String),
+#[derive(Debug, Clone)]
+pub struct Token {
+    pub raw: String,
+    pub offset_x: u32,
+    pub offset_y: u32,
 }
 
-pub fn get_userinput(state: &State, config: &ShellConfig) -> Option<Vec<UserInput>> {
-    let mut input_buffer = String::new();
-
-    clear_input_buffer();
-
-    loop {
-        if poll(Duration::from_millis(1000)).unwrap() {
-            let event = read().unwrap();
-
-            match event {
-                Event::Key(key) => {
-                    if !key.is_release() {
-                        ()
-                    } else {
-                        match key.code {
-                            KeyCode::Enter => {
-                                break;
-                            }
-                            KeyCode::Tab => {
-                                println!("tab");
-                            }
-                            KeyCode::Backspace => {
-                                // todo fix this currently not working
-                                input_buffer.pop();
-                                print!("\r{} ", input_buffer);
-                            }
-                            code => {
-                                print!("{}", code.as_char().unwrap_or(' '));
-                                input_buffer.push(code.as_char().unwrap_or(' '));
-                            }
-                        }
-                    }
-                }
-                _ => println!("dont care"),
-            }
-
-            std::io::stdout().flush().unwrap();
-        } else {
-            // duration expired
+impl Token {
+    pub fn new(x: u32, y: u32) -> Token {
+        Token {
+            raw: String::new(),
+            offset_x: x,
+            offset_y: y,
         }
     }
-
-    println!("exiting");
-    todo!()
 }
 
-fn clear_input_buffer() {
-    while poll(std::time::Duration::from_millis(1)).unwrap() {
-        let _ = read();
+pub fn tokenize(input: &str) -> Vec<Token> {
+    let mut out = Vec::new();
+    let mut offset_x = 0;
+    let mut offset_y = 0;
+
+    let mut temp = Token::new(offset_x, offset_y);
+
+    for c in input.chars() {
+        if c == '\n' {
+            // finalize token before newline
+            if !temp.raw.is_empty() {
+                out.push(temp);
+                temp = Token::new(0, offset_y + 1);
+            }
+
+            offset_y += 1;
+            offset_x = 0;
+            continue;
+        }
+
+        if c.is_whitespace() {
+            if !temp.raw.is_empty() {
+                out.push(temp);
+                temp = Token::new(offset_x, offset_y);
+            }
+        } else {
+            temp.raw.push(c);
+        }
+
+        offset_x += c.len_utf8() as u32;
     }
+
+    if !temp.raw.is_empty() {
+        out.push(temp);
+    }
+
+    out
 }
