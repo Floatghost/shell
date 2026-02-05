@@ -10,8 +10,8 @@ use crossterm::{
 };
 
 use crate::{
-    find::{complete_command, complete_path, Found},
-    userinput::{tokenize, Token},
+    find::{Found, complete_command, complete_path},
+    userinput::{Token, tokenize},
 };
 
 #[derive(Debug)]
@@ -105,6 +105,7 @@ impl ReadLine {
                                                 }
                                             },
                                         );
+                                    } else if results.len() == 0 {
                                     } else {
                                         results.sort_by(|a, b| {
                                             a.file_name().len().cmp(&b.file_name().len())

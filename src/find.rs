@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::app::State;
 
@@ -63,47 +63,42 @@ pub fn complete_command(prefix: &str) -> Vec<Found> {
 }
 
 pub fn complete_path(prefix: &str) -> Vec<Found> {
-    // convert all "\" to "/"
-    let clean_prefix: String = prefix.chars().map(|c| if c == '\\' {'/'} else {c}).collect();
+    let mut clean = prefix.replace("/", "\\");
 
-    let path = if clean_prefix.to_lowercase().starts_with("c:") {
-        // for every new / extend the path if this fails but we arent in the last / jet discard
-        let mut potential_path = PathBuf::from("C:\\");
-        let parts: Vec<&str> = clean_prefix.split("/").skip(1).collect(); // skip C:\
-
-        for part in parts {
-            // work here
-        }
-    } else {
-
-    };
-
-    // check if starts with an drive letter and ":"
-    //
-    // otherwise check in local dir
-
-    // create path to the dir
-
-    // loop through the dir
-
-// todo get drive letters
-    println!("complete path");
-    let path = if prefix.to_lowercase().starts_with("c:") {
-        println!("drive");
-    } else if prefix.starts_with("./") || prefix.starts_with(".\\") {
-
-    } else {
-
+    if clean.len() == 2 && clean.ends_with(':') {
+        clean.push('\\');
     }
 
-    todo!()
-}
+    let (dir, partial) = if clean.ends_with('\\') {
+        (clean.clone(), "")
+    } else {
+        match clean.rsplit_once('\\') {
+            Some((d, p)) => (format!("{}\\", d), p),
+            None => (".\\".into(), clean.as_str()),
+        }
+    };
 
-#[allow(unused)]
-pub fn find_in_local(state: &State) -> std::io::Result<Vec<Found>> {
-    let entrys = std::fs::read_dir(state.cwd.clone())?;
+    let dir_path = Path::new(&dir);
 
-    for entry in entrys {}
+    let entries = match std::fs::read_dir(dir_path) {
+        Ok(e) => e,
+        Err(_) => return Vec::new(),
+    };
 
-    todo!();
+    let mut out = Vec::new();
+
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+
+        if !name
+            .to_ascii_lowercase()
+            .starts_with(&partial.to_ascii_lowercase())
+        {
+            continue;
+        }
+
+        out.push(Found::Path(entry.path()));
+    }
+
+    out
 }
