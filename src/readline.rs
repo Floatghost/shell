@@ -15,6 +15,7 @@ use crate::{
 };
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct ReadLine {
     cursor_x: u16,
     start_pos: (u16, u16),
@@ -39,6 +40,7 @@ impl ReadLine {
 
         ReadLine::clear_input_buffer();
 
+        #[allow(unused)]
         loop {
             if poll(Duration::from_millis(50)).unwrap() {
                 match read().unwrap() {
@@ -178,8 +180,6 @@ impl ReadLine {
                 }
             }
         }
-
-        todo!();
     }
 
     fn insert(&mut self, c: char) {

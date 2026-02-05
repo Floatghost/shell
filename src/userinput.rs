@@ -1,4 +1,5 @@
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Token {
     pub raw: String,
     pub offset_x: u32,

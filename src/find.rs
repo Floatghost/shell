@@ -1,8 +1,9 @@
-use std::{collections::btree_map::Entry, path::PathBuf};
+use std::path::PathBuf;
 
 use crate::app::State;
 
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub enum Found {
     Path(PathBuf),
     EnvPath(PathBuf),
@@ -61,6 +62,7 @@ pub fn complete_command(prefix: &str) -> Vec<Found> {
     out
 }
 
+#[allow(unused)]
 pub fn find_in_local(state: &State) -> std::io::Result<Vec<Found>> {
     let entrys = std::fs::read_dir(state.cwd.clone())?;
 

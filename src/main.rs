@@ -23,7 +23,9 @@ fn main() {
     let config = ShellConfig::new("./shell.toml").unwrap();
 
     enable_raw_mode().unwrap();
-    let exit = ExitStrat;
+    let _ = ExitStrat;
+
+    let mut return_code = None;
 
     loop {
         state.refresh();
@@ -51,12 +53,12 @@ fn main() {
             if let Runner::InBuilt(com) = &command.runner {
                 if com == &BuiltIn::Exit {
                     print!("\x1b[0m");
+                    println!("return {:?}", return_code);
                     break;
                 }
             }
 
-            let return_code = command.exec(&mut state);
-            // println!("{:?}", return_code);
+            return_code = command.exec(&mut state);
         } else {
             println!("could not find \"{}\"", &exec);
         }
