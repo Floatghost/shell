@@ -10,8 +10,8 @@ use crossterm::{
 };
 
 use crate::{
-    find::{Found, complete_command},
-    userinput::{Token, tokenize},
+    find::{complete_command, complete_path, Found},
+    userinput::{tokenize, Token},
 };
 
 #[derive(Debug)]
@@ -90,6 +90,7 @@ impl ReadLine {
                                     let mut results = Vec::new();
 
                                     results.extend_from_slice(&complete_command(&focused.raw));
+                                    results.extend_from_slice(&complete_path(&focused.raw));
 
                                     // merge all results if only one result is found replace the token with the result
                                     // assuming it changed
