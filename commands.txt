@@ -1,1 +1,0 @@
-ls -a | find "lieblings tier.png" | open & dwea

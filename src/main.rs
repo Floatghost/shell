@@ -1,6 +1,5 @@
 mod parse_input;
 use std::{
-    io::stdin,
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
@@ -44,7 +43,7 @@ fn main() {
     }
 
     let mut state = State::new();
-    let config = ShellConfig::new().unwrap();
+    let mut config = ShellConfig::new().unwrap();
 
     enable_raw_mode().unwrap();
     let _ = ExitStrat;
@@ -87,7 +86,7 @@ fn main() {
             }
 
             disable_raw_mode().unwrap();
-            return_code = command.exec(&mut state);
+            return_code = command.exec(&mut state, &mut config);
             enable_raw_mode().unwrap();
         } else {
             println!("could not find \"{}\"", &exec);

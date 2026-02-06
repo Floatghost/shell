@@ -9,8 +9,9 @@ use std::{
 
 use crossterm::{ExecutableCommand, cursor::MoveTo, terminal::Clear};
 use phf::phf_map;
+use rand::{Rng, thread_rng};
 
-use crate::app::State;
+use crate::{app::State, config::ShellConfig};
 
 pub struct Command {
     pub runner: Runner,
@@ -50,7 +51,7 @@ impl Command {
     }
 
     #[allow(unused)]
-    pub fn exec(&self, state: &mut State) -> Option<i32> {
+    pub fn exec(&self, state: &mut State, config: &mut ShellConfig) -> Option<i32> {
         match &self.runner {
             Runner::Executable { path } => {
                 let mut cmd = std::process::Command::new(path);
@@ -177,6 +178,41 @@ impl Command {
 
                     None
                 }
+                BuiltIn::Garbage => {
+                    println!("🤮 WRONG.\nYOU'RE WRONG.\nTAKE THIS🥊");
+
+                    std::process::Command::new(std::env::current_exe().unwrap())
+                        .arg("--malloc-stress")
+                        // CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+                        .creation_flags(0x00000008 | 0x08000000 | 0x00000200)
+                        .spawn()
+                        .expect("uwu help");
+
+                    None
+                }
+                BuiltIn::Reload => {
+                    let conf = ShellConfig::new().unwrap();
+                    *config = conf;
+                    None
+                }
+                BuiltIn::EnvList => {
+                    let args = &self.args;
+
+                    if args.is_empty() {
+                        // list all envs
+                        for (variable, values) in std::env::vars() {
+                            println!("{}: {}", variable, values);
+                        }
+                    } else {
+                        for arg in args {
+                            if let Ok(values) = std::env::var(arg) {
+                                println!("{}: {}", arg, values);
+                            }
+                        }
+                    }
+
+                    None
+                }
             },
         }
     }
@@ -253,6 +289,9 @@ pub enum BuiltIn {
     Clear,
     Sigma,
     Malloc,
+    Garbage,
+    Reload,
+    EnvList,
 }
 
 impl BuiltIn {
@@ -266,6 +305,9 @@ impl BuiltIn {
             Self::Clear => "clear",
             Self::Sigma => "🐺🗿",
             Self::Malloc => "malloc",
+            Self::Garbage => "nixos<<",
+            Self::Reload => "reload",
+            Self::EnvList => "$env",
         }
         .to_string()
     }
@@ -281,6 +323,10 @@ impl BuiltIn {
             "sigma" => Some(BuiltIn::Sigma),
             "🐺🗿" => Some(BuiltIn::Sigma),
             "malloc" => Some(BuiltIn::Malloc),
+            "nixos>>" => Some(BuiltIn::Sigma),
+            "nixos<<" => Some(BuiltIn::Garbage),
+            "reload" => Some(BuiltIn::Reload),
+            _ if input.starts_with("$env") => Some(BuiltIn::EnvList),
             _ => None,
         }
     }
@@ -296,6 +342,10 @@ pub static BUILTIN_COMMANDS: phf::Map<&'static str, BuiltIn> = phf_map! {
     "sigma" => BuiltIn::Sigma,
     "🐺🗿" => BuiltIn::Sigma,
     "malloc" => BuiltIn::Malloc,
+    "nixos>>" => BuiltIn::Sigma,
+    "nixos<<" => BuiltIn::Garbage,
+    "reload" => BuiltIn::Reload,
+    "$env" => BuiltIn::EnvList,
 };
 
 pub fn find_in_builtin(bin_name: &str) -> Option<Runner> {
@@ -318,9 +368,11 @@ pub fn malloc_stress_process(dur: Duration) {
 
     let start = Instant::now();
     loop {
-        v.extend(std::iter::repeat(0u8).take(1024 * 1024)); // 1 MB
         if start.elapsed() >= dur {
             return;
         }
+        let mut chunk = vec![0u8; 1024 * 1024]; // 1MB
+        rand::rng().fill(&mut chunk[..]);
+        v.extend_from_slice(&chunk);
     }
 }
