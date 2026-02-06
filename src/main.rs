@@ -1,5 +1,9 @@
 mod parse_input;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    io::stdin,
+    sync::atomic::{AtomicUsize, Ordering},
+    time::Duration,
+};
 
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 mod app;
@@ -13,7 +17,7 @@ mod userinput;
 
 use crate::{
     app::State,
-    command::{BuiltIn, Command, Runner},
+    command::{BuiltIn, Command, Runner, malloc_stress_process},
     config::ShellConfig,
     parse_input::tokenize,
     readline::ReadLine,
@@ -33,6 +37,11 @@ fn main() {
         println!();
     })
     .expect("failed to set ctrl-c handler");
+
+    if std::env::args().any(|a| a == "--malloc-stress") {
+        malloc_stress_process(Duration::from_secs(10));
+        return;
+    }
 
     let mut state = State::new();
     let config = ShellConfig::new().unwrap();

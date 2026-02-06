@@ -1,4 +1,11 @@
-use std::{env, io::stdout, path::PathBuf, process::Stdio};
+use std::{
+    env,
+    io::{BufWriter, stdout},
+    os::windows::process::CommandExt,
+    path::PathBuf,
+    process::Stdio,
+    time::{Duration, Instant},
+};
 
 use crossterm::{ExecutableCommand, cursor::MoveTo, terminal::Clear};
 use phf::phf_map;
@@ -160,6 +167,16 @@ impl Command {
 
                     None
                 }
+                BuiltIn::Malloc => {
+                    std::process::Command::new(std::env::current_exe().unwrap())
+                        .arg("--malloc-stress")
+                        // CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+                        .creation_flags(0x00000008 | 0x08000000 | 0x00000200)
+                        .spawn()
+                        .expect("uwu help");
+
+                    None
+                }
             },
         }
     }
@@ -235,6 +252,7 @@ pub enum BuiltIn {
     Where,
     Clear,
     Sigma,
+    Malloc,
 }
 
 impl BuiltIn {
@@ -247,6 +265,7 @@ impl BuiltIn {
             Self::Where => "where",
             Self::Clear => "clear",
             Self::Sigma => "🐺🗿",
+            Self::Malloc => "malloc",
         }
         .to_string()
     }
@@ -261,6 +280,7 @@ impl BuiltIn {
             "clear" => Some(BuiltIn::Clear),
             "sigma" => Some(BuiltIn::Sigma),
             "🐺🗿" => Some(BuiltIn::Sigma),
+            "malloc" => Some(BuiltIn::Malloc),
             _ => None,
         }
     }
@@ -275,10 +295,32 @@ pub static BUILTIN_COMMANDS: phf::Map<&'static str, BuiltIn> = phf_map! {
     "clear" => BuiltIn::Clear,
     "sigma" => BuiltIn::Sigma,
     "🐺🗿" => BuiltIn::Sigma,
+    "malloc" => BuiltIn::Malloc,
 };
 
 pub fn find_in_builtin(bin_name: &str) -> Option<Runner> {
     Some(Runner::InBuilt(
         BuiltIn::from(&bin_name.to_lowercase())?.clone(),
     ))
+}
+
+pub fn malloc_stress_process(dur: Duration) {
+    let mut v = Vec::<u8>::new();
+
+    if cfg!(debug_assertions) {
+        for _ in 0..50 {
+            v.extend(std::iter::repeat(0u8).take(1024 * 1024)); // 1 MB
+        }
+
+        std::thread::sleep(dur);
+        return;
+    }
+
+    let start = Instant::now();
+    loop {
+        v.extend(std::iter::repeat(0u8).take(1024 * 1024)); // 1 MB
+        if start.elapsed() >= dur {
+            return;
+        }
+    }
 }
