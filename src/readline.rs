@@ -153,10 +153,9 @@ impl ReadLine {
                                     self.tab_cache = None;
                                 }
                                 KeyCode::Right => {
-                                    self.cursor_x = self
-                                        .cursor_x
-                                        .saturating_add(1)
-                                        .min((self.buffer.len()) as u16);
+                                    let char_count = self.buffer.chars().count();
+                                    self.cursor_x =
+                                        self.cursor_x.saturating_add(1).min(char_count as u16);
                                     let mut out = stdout();
                                     out.execute(cursor::MoveTo(
                                         self.start_pos.0 + self.cursor_x,
@@ -173,7 +172,7 @@ impl ReadLine {
                                     self.tab_cache = None;
                                 }
                                 KeyCode::End => {
-                                    self.cursor_x = self.buffer.len() as u16;
+                                    self.cursor_x = self.buffer.chars().count() as u16;
                                     let mut out = stdout();
                                     out.execute(cursor::MoveTo(
                                         self.cursor_x + self.start_pos.0,
@@ -194,9 +193,18 @@ impl ReadLine {
         }
     }
 
+    fn get_cursor_byte_index(&self) -> usize {
+        self.buffer
+            .chars()
+            .take(self.cursor_x as usize)
+            .map(|c| c.len_utf8())
+            .sum()
+    }
+
     fn insert(&mut self, c: char) {
         // we dont need to clear the line since the new line is going to be bigger
-        self.buffer.insert(self.cursor_x as usize, c);
+        let byte_idx = self.get_cursor_byte_index();
+        self.buffer.insert(byte_idx, c);
         self.cursor_x += 1;
 
         let mut out = stdout();
@@ -207,9 +215,7 @@ impl ReadLine {
         ))
         .unwrap();
 
-        let redraw_point = (self.cursor_x - 1) as usize;
-        out.queue(style::Print(&self.buffer[redraw_point..]))
-            .unwrap();
+        out.queue(style::Print(&self.buffer[byte_idx..])).unwrap();
 
         out.queue(cursor::MoveTo(
             self.cursor_x + self.start_pos.0,
@@ -225,13 +231,14 @@ impl ReadLine {
             // only delete chars that are before the bar
             return;
         }
-        self.buffer.remove(self.cursor_x as usize - 1);
         self.cursor_x -= 1;
+        let byte_idx = self.get_cursor_byte_index();
+        self.buffer.remove(byte_idx);
 
         let mut out = stdout();
 
-        let buffer_redraw_point = self.cursor_x;
-        let terminal_redraw_point = buffer_redraw_point + self.start_pos.0;
+        let buffer_redraw_point = byte_idx;
+        let terminal_redraw_point = self.cursor_x + self.start_pos.0;
 
         out.queue(cursor::MoveTo(terminal_redraw_point, self.start_pos.1))
             .unwrap();
@@ -258,7 +265,7 @@ impl ReadLine {
     }
 
     fn get_focused_token(&self, tokens: &[Token]) -> Token {
-        let cx = self.cursor_x as usize;
+        let cx = self.get_cursor_byte_index();
 
         for token in tokens {
             let start = token.offset_x as usize;
@@ -312,7 +319,7 @@ impl ReadLine {
         }
 
         let new_cursor = start + new_len;
-        self.cursor_x = new_cursor as u16;
+        self.cursor_x = self.buffer[..new_cursor].chars().count() as u16;
 
         out.queue(cursor::MoveTo(
             self.start_pos.0 + self.cursor_x,
