@@ -1,12 +1,16 @@
 use std::path::{Path, PathBuf};
 
-use crate::app::State;
+use crate::{
+    app::State,
+    command::{BUILTIN_COMMANDS, BuiltIn},
+};
 
 #[derive(Debug, Clone)]
 #[allow(unused)]
 pub enum Found {
     Path(PathBuf),
     EnvPath(PathBuf),
+    BuiltIn(BuiltIn),
 }
 
 impl Found {
@@ -14,6 +18,7 @@ impl Found {
         match self {
             Found::Path(p) => p.file_name().unwrap().to_str().unwrap().to_string(),
             Found::EnvPath(envp) => envp.file_name().unwrap().to_str().unwrap().to_string(),
+            Found::BuiltIn(b) => b.to_string(),
         }
     }
 }
@@ -98,6 +103,18 @@ pub fn complete_path(prefix: &str) -> Vec<Found> {
         }
 
         out.push(Found::Path(entry.path()));
+    }
+
+    out
+}
+
+pub fn complete_builtin(prefix: &str) -> Vec<Found> {
+    let mut out = Vec::new();
+
+    for (command, builtin) in BUILTIN_COMMANDS.into_iter() {
+        if command.starts_with(prefix) {
+            out.push(Found::BuiltIn(builtin.to_owned()));
+        }
     }
 
     out
