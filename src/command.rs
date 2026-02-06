@@ -219,6 +219,30 @@ pub enum BuiltIn {
     Where,
 }
 
+impl BuiltIn {
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::Exit => "exit",
+            Self::Cd => "cd",
+            Self::PWD => "pwd",
+            Self::Ls => "ls",
+            Self::Where => "where",
+        }
+        .to_string()
+    }
+
+    pub fn from(input: &str) -> Option<Self> {
+        match input {
+            "exit" => Some(BuiltIn::Exit),
+            "cd" => Some(BuiltIn::Cd),
+            "pwd" => Some(BuiltIn::PWD),
+            "ls" => Some(BuiltIn::Ls),
+            "where" => Some(BuiltIn::Where),
+            _ => None,
+        }
+    }
+}
+
 pub static BUILTIN_COMMANDS: phf::Map<&'static str, BuiltIn> = phf_map! {
     "exit" => BuiltIn::Exit,
     "cd"   => BuiltIn::Cd,
@@ -229,6 +253,6 @@ pub static BUILTIN_COMMANDS: phf::Map<&'static str, BuiltIn> = phf_map! {
 
 pub fn find_in_builtin(bin_name: &str) -> Option<Runner> {
     Some(Runner::InBuilt(
-        BUILTIN_COMMANDS.get(&bin_name.to_lowercase())?.clone(),
+        BuiltIn::from(&bin_name.to_lowercase())?.clone(),
     ))
 }

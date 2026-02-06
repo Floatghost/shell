@@ -8,9 +8,10 @@ use crossterm::{
     event::{Event, KeyCode, KeyEvent, KeyModifiers, poll, read},
     style,
 };
+use toml::to_string;
 
 use crate::{
-    find::{Found, complete_command, complete_path},
+    find::{Found, complete_builtin, complete_command, complete_path},
     userinput::{Token, tokenize},
 };
 
@@ -21,6 +22,8 @@ pub struct ReadLine {
     start_pos: (u16, u16),
     buffer: String,
     prompt: String,
+    tab_cache: Option<Vec<Found>>,
+    tab_clock: usize,
 }
 
 impl ReadLine {
@@ -30,6 +33,8 @@ impl ReadLine {
             start_pos: (0, 0),
             buffer: String::new(),
             prompt: last_prompt_line.to_string(),
+            tab_cache: None,
+            tab_clock: 0,
         }
     }
 
@@ -72,6 +77,8 @@ impl ReadLine {
                                 kind,
                             } => match code {
                                 KeyCode::Tab => {
+                                    let mut overwrite = String::new();
+
                                     // parse buffer and give back tokens + their offsets
                                     let tokens = tokenize(&self.buffer);
 
@@ -87,39 +94,36 @@ impl ReadLine {
 
                                     // println!("focused: {:?}", focused);
 
-                                    let mut results = Vec::new();
-
-                                    results.extend_from_slice(&complete_command(&focused.raw));
-                                    results.extend_from_slice(&complete_path(&focused.raw));
-
-                                    // merge all results if only one result is found replace the token with the result
-                                    // assuming it changed
-
-                                    if results.len() == 1 {
-                                        self.overwrite_token(
-                                            &focused,
-                                            match &results[0] {
-                                                Found::Path(p) => p.to_str().unwrap(),
-                                                Found::EnvPath(envp) => {
-                                                    envp.file_name().unwrap().to_str().unwrap()
-                                                }
-                                            },
-                                        );
-                                    } else if results.len() == 0 {
+                                    if let Some(cached) = &self.tab_cache {
+                                        if self.tab_clock == cached.len() {
+                                            self.tab_clock = 0;
+                                        }
+                                        overwrite = cached[self.tab_clock].file_name();
+                                        self.tab_clock += 1;
                                     } else {
-                                        results.sort_by(|a, b| {
-                                            a.file_name().len().cmp(&b.file_name().len())
-                                        });
-                                        self.overwrite_token(
-                                            &focused,
-                                            match &results[0] {
-                                                Found::Path(p) => p.to_str().unwrap(),
-                                                Found::EnvPath(envp) => {
-                                                    envp.file_name().unwrap().to_str().unwrap()
-                                                }
-                                            },
-                                        );
+                                        let mut results = Vec::new();
+
+                                        results.extend_from_slice(&complete_builtin(&focused.raw));
+                                        results.extend_from_slice(&complete_command(&focused.raw));
+                                        results.extend_from_slice(&complete_path(&focused.raw));
+
+                                        // merge all results if only one result is found replace the token with the result
+                                        // assuming it changed
+
+                                        if results.len() == 0 {
+                                            continue;
+                                        }
+                                        if results.len() > 1 {
+                                            results.sort_by(|a, b| {
+                                                a.file_name().len().cmp(&b.file_name().len())
+                                            });
+                                            self.tab_cache = Some(results.clone());
+                                            self.tab_clock = 1;
+                                        }
+
+                                        overwrite = results[0].file_name();
                                     }
+                                    self.overwrite_token(&focused, &overwrite);
 
                                     // other wise dont do anything
                                 }
@@ -132,9 +136,11 @@ impl ReadLine {
                                         return Err("ctrl-c".into());
                                     }
                                     self.insert(c);
+                                    self.tab_cache = None;
                                 }
                                 KeyCode::Backspace => {
                                     self.remove();
+                                    self.tab_cache = None;
                                 }
                                 KeyCode::Left => {
                                     self.cursor_x = self.cursor_x.saturating_sub(1);
@@ -144,6 +150,7 @@ impl ReadLine {
                                         self.start_pos.1,
                                     ))
                                     .unwrap();
+                                    self.tab_cache = None;
                                 }
                                 KeyCode::Right => {
                                     self.cursor_x = self
@@ -156,12 +163,14 @@ impl ReadLine {
                                         self.start_pos.1,
                                     ))
                                     .unwrap();
+                                    self.tab_cache = None;
                                 }
                                 KeyCode::Home => {
                                     self.cursor_x = 0;
                                     let mut out = stdout();
                                     out.execute(cursor::MoveTo(self.start_pos.0, self.start_pos.1))
                                         .unwrap();
+                                    self.tab_cache = None;
                                 }
                                 KeyCode::End => {
                                     self.cursor_x = self.buffer.len() as u16;
@@ -171,6 +180,7 @@ impl ReadLine {
                                         self.start_pos.1,
                                     ))
                                     .unwrap();
+                                    self.tab_cache = None;
                                 }
                                 _ => (),
                             },
