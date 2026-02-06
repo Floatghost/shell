@@ -1,9 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::{
-    app::State,
-    command::{BUILTIN_COMMANDS, BuiltIn},
-};
+use crate::command::{BUILTIN_COMMANDS, BuiltIn};
 
 #[derive(Debug, Clone)]
 #[allow(unused)]

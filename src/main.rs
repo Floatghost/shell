@@ -1,4 +1,6 @@
 mod parse_input;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 mod app;
 mod command;
@@ -18,7 +20,20 @@ use crate::{
     render::render_prompt,
 };
 
+pub static CTRLC_COUNT: AtomicUsize = AtomicUsize::new(0);
+
 fn main() {
+    ctrlc::set_handler(move || {
+        let prev = CTRLC_COUNT.fetch_add(1, Ordering::SeqCst);
+
+        if prev >= 1 {
+            std::process::exit(0);
+        }
+
+        println!();
+    })
+    .expect("failed to set ctrl-c handler");
+
     let mut state = State::new();
     let config = ShellConfig::new().unwrap();
 
@@ -37,12 +52,16 @@ fn main() {
         let userinput = match readline.get_line() {
             Ok(n) => n,
             Err(e) => match e.as_str() {
-                "ctrl-c" => return,
+                "ctrl-c" => continue,
                 _ => panic!("ERROR: {}", e),
             },
         };
 
         let tokens = tokenize(&userinput);
+
+        if tokens.is_empty() {
+            continue;
+        }
 
         let exec = &tokens[0];
         let args = &tokens[1..];
@@ -58,7 +77,9 @@ fn main() {
                 break;
             }
 
+            disable_raw_mode().unwrap();
             return_code = command.exec(&mut state);
+            enable_raw_mode().unwrap();
         } else {
             println!("could not find \"{}\"", &exec);
         }

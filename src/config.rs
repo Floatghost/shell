@@ -1,8 +1,7 @@
 use std::collections::HashMap;
-use std::fs::{self, OpenOptions};
+use std::fs::{self};
 use std::io::Write;
 use std::path::PathBuf;
-use std::slice::GetDisjointMutError;
 
 use serde::Deserialize;
 
@@ -31,7 +30,7 @@ impl ShellConfig {
         let filepath = ShellConfig::config_path();
         let content = match fs::read_to_string(&filepath) {
             Ok(c) => c,
-            Err(e) => ShellConfig::generate_default_conf(&filepath)?,
+            Err(_e) => ShellConfig::generate_default_conf(&filepath)?,
         };
         let raw: RawShellConfig = toml::from_str(&content)?;
         Ok(raw.resolve_config())

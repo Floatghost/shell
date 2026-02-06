@@ -8,9 +8,9 @@ use crossterm::{
     event::{Event, KeyCode, KeyEvent, KeyModifiers, poll, read},
     style,
 };
-use toml::to_string;
 
 use crate::{
+    CTRLC_COUNT,
     find::{Found, complete_builtin, complete_command, complete_path},
     userinput::{Token, tokenize},
 };
@@ -60,6 +60,7 @@ impl ReadLine {
                                 } => {
                                     if let KeyCode::Char(c) = code
                                         && modifiers.contains(KeyModifiers::CONTROL)
+                                        && c == 'c'
                                     {
                                         return Err("ctrl-c".into());
                                     }
@@ -77,6 +78,7 @@ impl ReadLine {
                                 kind,
                             } => match code {
                                 KeyCode::Tab => {
+                                    CTRLC_COUNT.store(1, std::sync::atomic::Ordering::SeqCst);
                                     let mut overwrite = String::new();
 
                                     // parse buffer and give back tokens + their offsets
@@ -110,7 +112,7 @@ impl ReadLine {
                                         // merge all results if only one result is found replace the token with the result
                                         // assuming it changed
 
-                                        if results.len() == 0 {
+                                        if results.is_empty() {
                                             continue;
                                         }
                                         if results.len() > 1 {
@@ -128,19 +130,22 @@ impl ReadLine {
                                     // other wise dont do anything
                                 }
                                 KeyCode::Enter => {
+                                    CTRLC_COUNT.store(1, std::sync::atomic::Ordering::SeqCst);
                                     println!();
                                     return Ok(self.buffer.clone());
                                 }
                                 KeyCode::Char(c) => {
-                                    if modifiers.contains(KeyModifiers::CONTROL) {
+                                    if modifiers.contains(KeyModifiers::CONTROL) && c == 'c' {
                                         return Err("ctrl-c".into());
                                     }
                                     self.insert(c);
                                     self.tab_cache = None;
+                                    CTRLC_COUNT.store(1, std::sync::atomic::Ordering::SeqCst);
                                 }
                                 KeyCode::Backspace => {
                                     self.remove();
                                     self.tab_cache = None;
+                                    CTRLC_COUNT.store(1, std::sync::atomic::Ordering::SeqCst);
                                 }
                                 KeyCode::Left => {
                                     self.cursor_x = self.cursor_x.saturating_sub(1);
@@ -151,6 +156,7 @@ impl ReadLine {
                                     ))
                                     .unwrap();
                                     self.tab_cache = None;
+                                    CTRLC_COUNT.store(1, std::sync::atomic::Ordering::SeqCst);
                                 }
                                 KeyCode::Right => {
                                     let char_count = self.buffer.chars().count();
@@ -163,6 +169,7 @@ impl ReadLine {
                                     ))
                                     .unwrap();
                                     self.tab_cache = None;
+                                    CTRLC_COUNT.store(1, std::sync::atomic::Ordering::SeqCst);
                                 }
                                 KeyCode::Home => {
                                     self.cursor_x = 0;
@@ -170,6 +177,7 @@ impl ReadLine {
                                     out.execute(cursor::MoveTo(self.start_pos.0, self.start_pos.1))
                                         .unwrap();
                                     self.tab_cache = None;
+                                    CTRLC_COUNT.store(1, std::sync::atomic::Ordering::SeqCst);
                                 }
                                 KeyCode::End => {
                                     self.cursor_x = self.buffer.chars().count() as u16;
@@ -180,6 +188,7 @@ impl ReadLine {
                                     ))
                                     .unwrap();
                                     self.tab_cache = None;
+                                    CTRLC_COUNT.store(1, std::sync::atomic::Ordering::SeqCst);
                                 }
                                 _ => (),
                             },
@@ -243,7 +252,7 @@ impl ReadLine {
         out.queue(cursor::MoveTo(terminal_redraw_point, self.start_pos.1))
             .unwrap();
 
-        out.queue(style::Print(&self.buffer[buffer_redraw_point as usize..]))
+        out.queue(style::Print(&self.buffer[buffer_redraw_point..]))
             .unwrap();
 
         // clear the deleted char
