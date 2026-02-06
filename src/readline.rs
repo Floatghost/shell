@@ -8,6 +8,7 @@ use crossterm::{
     event::{Event, KeyCode, KeyEvent, KeyModifiers, poll, read},
     style,
 };
+use unicode_width::UnicodeWidthStr;
 
 use crate::{
     CTRLC_COUNT,
@@ -126,6 +127,8 @@ impl ReadLine {
                                         overwrite = results[0].file_name();
                                     }
                                     self.overwrite_token(&focused, &overwrite);
+                                    // dbg!(focused);
+                                    // dbg!(overwrite);
 
                                     // other wise dont do anything
                                 }
@@ -135,9 +138,9 @@ impl ReadLine {
                                     return Ok(self.buffer.clone());
                                 }
                                 KeyCode::Char(c) => {
-                                    if modifiers.contains(KeyModifiers::CONTROL) && c == 'c' {
-                                        return Err("ctrl-c".into());
-                                    }
+                                    // if modifiers.contains(KeyModifiers::CONTROL) && c == 'c' {
+                                    //     return Err("ctrl-c".into());
+                                    // }
                                     self.insert(c);
                                     self.tab_cache = None;
                                     CTRLC_COUNT.store(1, std::sync::atomic::Ordering::SeqCst);
@@ -151,7 +154,7 @@ impl ReadLine {
                                     self.cursor_x = self.cursor_x.saturating_sub(1);
                                     let mut out = stdout();
                                     out.execute(cursor::MoveTo(
-                                        self.start_pos.0 + self.cursor_x,
+                                        self.start_pos.0 + self.cursor_col(),
                                         self.start_pos.1,
                                     ))
                                     .unwrap();
@@ -164,7 +167,7 @@ impl ReadLine {
                                         self.cursor_x.saturating_add(1).min(char_count as u16);
                                     let mut out = stdout();
                                     out.execute(cursor::MoveTo(
-                                        self.start_pos.0 + self.cursor_x,
+                                        self.start_pos.0 + self.cursor_col(),
                                         self.start_pos.1,
                                     ))
                                     .unwrap();
@@ -183,7 +186,7 @@ impl ReadLine {
                                     self.cursor_x = self.buffer.chars().count() as u16;
                                     let mut out = stdout();
                                     out.execute(cursor::MoveTo(
-                                        self.cursor_x + self.start_pos.0,
+                                        self.cursor_col() + self.start_pos.0,
                                         self.start_pos.1,
                                     ))
                                     .unwrap();
@@ -202,7 +205,7 @@ impl ReadLine {
         }
     }
 
-    fn get_cursor_byte_index(&self) -> usize {
+    fn cursor_byte_index(&self) -> usize {
         self.buffer
             .chars()
             .take(self.cursor_x as usize)
@@ -210,16 +213,25 @@ impl ReadLine {
             .sum()
     }
 
+    fn cursor_col(&self) -> u16 {
+        let b = self.cursor_byte_index();
+        UnicodeWidthStr::width(&self.buffer[..b]) as u16
+    }
+
+    fn col_at_byte(&self, byte_idx: usize) -> u16 {
+        UnicodeWidthStr::width(&self.buffer[..byte_idx]) as u16
+    }
+
     fn insert(&mut self, c: char) {
         // we dont need to clear the line since the new line is going to be bigger
-        let byte_idx = self.get_cursor_byte_index();
+        let byte_idx = self.cursor_byte_index();
         self.buffer.insert(byte_idx, c);
         self.cursor_x += 1;
 
         let mut out = stdout();
 
         out.queue(cursor::MoveTo(
-            self.cursor_x - 1 + self.start_pos.0,
+            self.cursor_col() - 1 + self.start_pos.0,
             self.start_pos.1,
         ))
         .unwrap();
@@ -227,7 +239,7 @@ impl ReadLine {
         out.queue(style::Print(&self.buffer[byte_idx..])).unwrap();
 
         out.queue(cursor::MoveTo(
-            self.cursor_x + self.start_pos.0,
+            self.cursor_col() + self.start_pos.0,
             self.start_pos.1,
         ))
         .unwrap();
@@ -241,13 +253,13 @@ impl ReadLine {
             return;
         }
         self.cursor_x -= 1;
-        let byte_idx = self.get_cursor_byte_index();
+        let byte_idx = self.cursor_byte_index();
         self.buffer.remove(byte_idx);
 
         let mut out = stdout();
 
         let buffer_redraw_point = byte_idx;
-        let terminal_redraw_point = self.cursor_x + self.start_pos.0;
+        let terminal_redraw_point = self.cursor_col() + self.start_pos.0;
 
         out.queue(cursor::MoveTo(terminal_redraw_point, self.start_pos.1))
             .unwrap();
@@ -259,7 +271,7 @@ impl ReadLine {
         out.queue(style::Print(" ")).unwrap();
 
         out.queue(cursor::MoveTo(
-            self.cursor_x + self.start_pos.0,
+            self.cursor_col() + self.start_pos.0,
             self.start_pos.1,
         ))
         .unwrap();
@@ -274,7 +286,7 @@ impl ReadLine {
     }
 
     fn get_focused_token(&self, tokens: &[Token]) -> Token {
-        let cx = self.get_cursor_byte_index();
+        let cx = self.cursor_byte_index();
 
         for token in tokens {
             let start = token.offset_x as usize;
@@ -303,8 +315,7 @@ impl ReadLine {
         let start = t.offset_x as usize;
         let end = start + t.raw.len();
 
-        let old_len = t.raw.len();
-        let new_len = replacing.len();
+        let old_tail = self.buffer.len() - end;
 
         self.buffer = format!(
             "{}{}{}",
@@ -314,24 +325,26 @@ impl ReadLine {
         );
 
         let mut out = stdout();
+
+        let start_col = self.col_at_byte(start);
         out.queue(cursor::MoveTo(
-            self.start_pos.0 + start as u16,
+            self.start_pos.0 + start_col,
             self.start_pos.1,
         ))
         .unwrap();
 
         out.queue(style::Print(&self.buffer[start..])).unwrap();
 
-        if new_len < old_len {
-            let diff = old_len - new_len;
-            out.queue(style::Print(" ".repeat(diff))).unwrap();
-        }
+        let clear_cols = UnicodeWidthStr::width(&self.buffer[self.buffer.len() - old_tail..]) + 4;
+        out.queue(style::Print(" ".repeat(clear_cols))).unwrap();
 
-        let new_cursor = start + new_len;
-        self.cursor_x = self.buffer[..new_cursor].chars().count() as u16;
+        let new_cursor_byte = start + replacing.len();
 
+        self.cursor_x = self.buffer[..new_cursor_byte].chars().count() as u16;
+
+        let new_cursor_col = self.col_at_byte(new_cursor_byte);
         out.queue(cursor::MoveTo(
-            self.start_pos.0 + self.cursor_x,
+            self.start_pos.0 + new_cursor_col,
             self.start_pos.1,
         ))
         .unwrap();

@@ -1,5 +1,6 @@
-use std::{env, path::PathBuf, process::Stdio};
+use std::{env, io::stdout, path::PathBuf, process::Stdio};
 
+use crossterm::{ExecutableCommand, cursor::MoveTo, terminal::Clear};
 use phf::phf_map;
 
 use crate::app::State;
@@ -144,6 +145,21 @@ impl Command {
 
                     None
                 }
+                BuiltIn::Clear => {
+                    let mut out = stdout();
+
+                    out.execute(Clear(crossterm::terminal::ClearType::All));
+                    out.execute(MoveTo(0, 0));
+
+                    None
+                }
+                BuiltIn::Sigma => {
+                    for i in 0..1000 {
+                        println!("Sigma 🐺🗿");
+                    }
+
+                    None
+                }
             },
         }
     }
@@ -217,6 +233,8 @@ pub enum BuiltIn {
     PWD, // print working dir
     Ls,
     Where,
+    Clear,
+    Sigma,
 }
 
 impl BuiltIn {
@@ -227,6 +245,8 @@ impl BuiltIn {
             Self::PWD => "pwd",
             Self::Ls => "ls",
             Self::Where => "where",
+            Self::Clear => "clear",
+            Self::Sigma => "🐺🗿",
         }
         .to_string()
     }
@@ -238,6 +258,9 @@ impl BuiltIn {
             "pwd" => Some(BuiltIn::PWD),
             "ls" => Some(BuiltIn::Ls),
             "where" => Some(BuiltIn::Where),
+            "clear" => Some(BuiltIn::Clear),
+            "sigma" => Some(BuiltIn::Sigma),
+            "🐺🗿" => Some(BuiltIn::Sigma),
             _ => None,
         }
     }
@@ -249,6 +272,9 @@ pub static BUILTIN_COMMANDS: phf::Map<&'static str, BuiltIn> = phf_map! {
     "pwd" => BuiltIn::PWD,
     "ls" => BuiltIn::Ls,
     "where" => BuiltIn::Where,
+    "clear" => BuiltIn::Clear,
+    "sigma" => BuiltIn::Sigma,
+    "🐺🗿" => BuiltIn::Sigma,
 };
 
 pub fn find_in_builtin(bin_name: &str) -> Option<Runner> {
