@@ -12,7 +12,7 @@ incase you want to test your memory ts shell has an memory tester builtin
 
 you can use it using the command "malloc"
 
-if you want to flex your coolnes you can use the "🐺🗿" command to succeed in life or you can just go to [cool website](https://glas-flex.ch/)
+if you want to flex your coolnes you can use the "🐺🗿" command to succeed in life or you can just go to ts [cool website](https://glas-flex.ch/)
 
 # why Rust
 because powershell is written in C#
