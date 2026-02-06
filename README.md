@@ -47,6 +47,6 @@ if it does that is user error
 
 # user errors
 
-when using tab some users experienced ts:
+when using tab some inexperienced users experienced ts:
 
 "sig" -> "🐺🗿" -> "sigverif.exe" -> "🐺🗿  .exe"
