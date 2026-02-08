@@ -9,7 +9,9 @@ use std::{
 
 use crossterm::{ExecutableCommand, cursor::MoveTo, terminal::Clear};
 use phf::phf_map;
-use rand::{Rng, thread_rng};
+use rand::Rng;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 use crate::{app::State, config::ShellConfig};
 
@@ -161,7 +163,7 @@ impl Command {
 
                     None
                 }
-                BuiltIn::Sigma => {
+                BuiltIn::Sigma | BuiltIn::NixOsSig => {
                     for i in 0..1000 {
                         println!("Sigma 🐺🗿");
                     }
@@ -209,6 +211,14 @@ impl Command {
                                 println!("{}: {}", arg, values);
                             }
                         }
+                    }
+
+                    None
+                }
+                BuiltIn::Help => {
+                    for command in BuiltIn::iter() {
+                        let aliases = command.aliases().join(", ");
+                        println!("{}", aliases);
                     }
 
                     None
@@ -279,7 +289,7 @@ pub fn find_in_path(bin_name: &str) -> Option<Runner> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter)]
 pub enum BuiltIn {
     Exit,
     Cd,
@@ -290,26 +300,33 @@ pub enum BuiltIn {
     Sigma,
     Malloc,
     Garbage,
+    NixOsSig,
     Reload,
     EnvList,
+    Help,
 }
 
 impl BuiltIn {
-    pub fn to_string(&self) -> String {
+    pub fn aliases(&self) -> &'static [&'static str] {
         match self {
-            Self::Exit => "exit",
-            Self::Cd => "cd",
-            Self::PWD => "pwd",
-            Self::Ls => "ls",
-            Self::Where => "where",
-            Self::Clear => "clear",
-            Self::Sigma => "🐺🗿",
-            Self::Malloc => "malloc",
-            Self::Garbage => "nixos<<",
-            Self::Reload => "reload",
-            Self::EnvList => "$env",
+            Self::Exit => &["exit"],
+            Self::Cd => &["cd"],
+            Self::PWD => &["pwd"],
+            Self::Ls => &["ls"],
+            Self::Where => &["where"],
+            Self::Clear => &["clear"],
+            Self::Sigma => &["🐺🗿", "sigma"],
+            Self::Malloc => &["malloc"],
+            Self::Garbage => &["nixos<<"],
+            Self::NixOsSig => &["nixos>>"],
+            Self::Reload => &["reload"],
+            Self::EnvList => &["$env", "env"],
+            Self::Help => &["help"],
         }
-        .to_string()
+    }
+
+    pub fn to_string(&self) -> String {
+        self.aliases()[0].to_string()
     }
 
     pub fn from(input: &str) -> Option<Self> {
@@ -323,10 +340,11 @@ impl BuiltIn {
             "sigma" => Some(BuiltIn::Sigma),
             "🐺🗿" => Some(BuiltIn::Sigma),
             "malloc" => Some(BuiltIn::Malloc),
-            "nixos>>" => Some(BuiltIn::Sigma),
+            "nixos>>" => Some(BuiltIn::NixOsSig),
             "nixos<<" => Some(BuiltIn::Garbage),
             "reload" => Some(BuiltIn::Reload),
-            _ if input.starts_with("$env") => Some(BuiltIn::EnvList),
+            "help" => Some(BuiltIn::Help),
+            _ if input.starts_with("$env") | input.starts_with("env") => Some(BuiltIn::EnvList),
             _ => None,
         }
     }
@@ -342,10 +360,12 @@ pub static BUILTIN_COMMANDS: phf::Map<&'static str, BuiltIn> = phf_map! {
     "sigma" => BuiltIn::Sigma,
     "🐺🗿" => BuiltIn::Sigma,
     "malloc" => BuiltIn::Malloc,
-    "nixos>>" => BuiltIn::Sigma,
+    "nixos>>" => BuiltIn::NixOsSig,
     "nixos<<" => BuiltIn::Garbage,
     "reload" => BuiltIn::Reload,
     "$env" => BuiltIn::EnvList,
+    "env" => BuiltIn::EnvList,
+    "help" => BuiltIn::Help,
 };
 
 pub fn find_in_builtin(bin_name: &str) -> Option<Runner> {
