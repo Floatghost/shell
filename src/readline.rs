@@ -12,8 +12,9 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     CTRLC_COUNT,
+    config::{Color, ColorValue},
     find::{Found, complete_builtin, complete_command, complete_path},
-    userinput::{Token, tokenize},
+    userinput::{Token, TokenType, tokenize},
 };
 
 #[derive(Debug)]
@@ -306,6 +307,7 @@ impl ReadLine {
 
         Token {
             raw: "".to_string(),
+            token_type: TokenType::Unknown,
             offset_x: cx as u32,
             offset_y: 0,
         }

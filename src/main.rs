@@ -7,9 +7,15 @@ use std::{
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 mod app;
 mod command;
+mod completion;
 mod config;
+mod editor;
 mod execute;
 mod find;
+mod highlight;
+mod input;
+mod parser;
+mod prompt_render;
 mod readline;
 mod render;
 mod userinput;
@@ -18,9 +24,10 @@ use crate::{
     app::State,
     command::{BuiltIn, Command, Runner, malloc_stress_process},
     config::ShellConfig,
+    editor::Editor,
     parse_input::tokenize,
-    readline::ReadLine,
-    render::render_prompt,
+    prompt_render::render_prompt,
+    render::RenderEngine,
 };
 
 pub static CTRLC_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -50,20 +57,25 @@ fn main() {
 
     let mut return_code = None;
 
+    let mut editor = Editor::new();
+    let mut renderer = &mut RenderEngine::new();
+
     loop {
         state.refresh();
         let prompt = render_prompt(&state, &config);
 
-        let last_prompt_line = prompt.lines().last().unwrap();
+        // let last_prompt_line = prompt.lines().last().unwrap();
 
-        let mut readline = ReadLine::new(last_prompt_line);
-        let userinput = match readline.get_line() {
-            Ok(n) => n,
-            Err(e) => match e.as_str() {
-                "ctrl-c" => continue,
-                _ => panic!("ERROR: {}", e),
-            },
-        };
+        // let mut readline = ReadLine::new(last_prompt_line);
+        // let userinput = match readline.get_line() {
+        //     Ok(n) => n,
+        //     Err(e) => match e.as_str() {
+        //         "ctrl-c" => continue,
+        //         _ => panic!("ERROR: {}", e),
+        //     },
+        // };
+
+        let userinput = editor.get_userinput(&mut renderer, &prompt).unwrap();
 
         let tokens = tokenize(&userinput);
 
@@ -91,6 +103,8 @@ fn main() {
         } else {
             println!("could not find \"{}\"", &exec);
         }
+
+        editor.clear();
     }
 }
 
