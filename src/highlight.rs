@@ -1,7 +1,7 @@
 use crate::{
     config::{Color, ColorValue},
     parser::parse,
-    userinput::tokenize,
+    userinput::TokenType,
 };
 
 pub struct StyledBlock {
@@ -16,19 +16,32 @@ pub fn highlight(buffer: &str) -> Vec<StyledBlock> {
     let mut styled = Vec::new();
 
     for (index, token) in tokens.iter().enumerate() {
-        if index == 0 {
-            styled.push(StyledBlock {
-                text: token.raw.clone(),
-                color_fg: ColorValue::Named(Color::Yellow),
-                color_bg: ColorValue::Named(Color::Default),
-            });
-        } else {
-            styled.push(StyledBlock {
-                text: token.raw.clone(),
-                color_fg: ColorValue::Named(Color::White),
-                color_bg: ColorValue::Named(Color::Default),
-            });
+        let mut styled_block = StyledBlock {
+            text: token.raw.clone(),
+            color_fg: ColorValue::Named(Color::White),
+            color_bg: ColorValue::Named(Color::Default),
+        };
+
+        match token {
+            _exit if token.raw.to_lowercase() == "exit" => {
+                styled_block.color_fg = ColorValue::Named(Color::Green);
+            }
+            _quote if token.token_type == TokenType::Quote => {
+                styled_block.color_fg = ColorValue::Named(Color::Cyan);
+            }
+            _arg if token.token_type == TokenType::Argument => {
+                styled_block.color_fg = ColorValue::Named(Color::Magenta);
+            }
+            _flag if token.token_type == TokenType::Flag => {
+                styled_block.color_fg = ColorValue::Named(Color::Gray);
+            }
+            _first if index == 0 => {
+                styled_block.color_fg = ColorValue::Named(Color::Yellow);
+            }
+            _ => (),
         }
+
+        styled.push(styled_block);
 
         if index + 1 != tokens.len() {
             styled.push(StyledBlock {

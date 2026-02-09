@@ -262,6 +262,7 @@ impl ColorValue {
 #[serde(rename_all = "lowercase")]
 pub enum Color {
     Black,
+    Gray,
     Red,
     Green,
     Yellow,
@@ -276,6 +277,7 @@ impl Color {
     pub fn to_ansi_fg(&self) -> &'static str {
         match self {
             Color::Black => "\x1b[30m",
+            Color::Gray => "\x1b[90m",
             Color::Red => "\x1b[31m",
             Color::Green => "\x1b[32m",
             Color::Yellow => "\x1b[33m",
@@ -290,6 +292,7 @@ impl Color {
     pub fn to_ansi_bg(&self) -> &'static str {
         match self {
             Color::Black => "\x1b[40m",
+            Color::Gray => "\x1b[100m",
             Color::Red => "\x1b[41m",
             Color::Green => "\x1b[42m",
             Color::Yellow => "\x1b[43m",
