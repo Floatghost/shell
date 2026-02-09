@@ -1,5 +1,4 @@
 use std::{
-    env,
     io::stdout,
     os::windows::process::CommandExt,
     path::PathBuf,
@@ -13,7 +12,12 @@ use rand::Rng;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::{app::State, config::ShellConfig, parser::parse};
+use crate::{
+    app::State,
+    config::ShellConfig,
+    find::{self, Found},
+    parser::parse,
+};
 
 pub struct Command {
     pub runner: Runner,
@@ -32,29 +36,24 @@ impl Command {
     pub fn new(command: &str) -> Option<Command> {
         let tokens = parse(command);
 
+        if tokens.is_empty() {
+            return None;
+        }
+
         let exec = &tokens[0].raw;
         let args: Vec<String> = tokens[1..].iter().map(|t| t.raw.to_string()).collect();
 
-        if let Some(run) = find_in_builtin(exec) {
-            return Some(Command {
-                runner: run,
-                args: args.to_vec(),
-            });
+        match find::resolve(exec) {
+            Some(Found::BuiltIn(b)) => Some(Command {
+                runner: Runner::InBuilt(b),
+                args,
+            }),
+            Some(Found::Path(p)) | Some(Found::EnvPath(p)) => Some(Command {
+                runner: Runner::Executable { path: p },
+                args,
+            }),
+            None => None,
         }
-        if let Some(path) = find_in_path(exec) {
-            return Some(Command {
-                runner: path,
-                args: args.to_vec(),
-            });
-        }
-        if let Some(path) = find_in_env(exec) {
-            return Some(Command {
-                runner: Runner::Executable { path },
-                args: args.to_vec(),
-            });
-        }
-
-        None
     }
 
     #[allow(unused)]
@@ -236,66 +235,6 @@ impl Command {
     }
 }
 
-/// find_in_env never returns an interpreted since there may be garbage in the path since
-/// programs dont expect the shell to just exec random files
-pub fn find_in_env(bin_name: &str) -> Option<PathBuf> {
-    let path_var = match env::var("PATH") {
-        Ok(val) => val,
-        Err(e) => {
-            eprintln!("Failed to read PATH: {}", e);
-            return None;
-        }
-    };
-
-    for dir in env::split_paths(&path_var) {
-        let full_path = dir.join(bin_name);
-
-        #[cfg(windows)]
-        let full_path = {
-            if full_path.extension().is_none() {
-                full_path.with_extension("exe")
-            } else {
-                full_path
-            }
-        };
-
-        if full_path.is_file() && full_path.extension().unwrap().to_str().unwrap() == "exe" {
-            return Some(full_path);
-        }
-    }
-
-    None
-}
-
-pub fn find_in_path(bin_name: &str) -> Option<Runner> {
-    let current_dir = env::current_dir().unwrap();
-
-    let full_path = current_dir.join(bin_name);
-
-    #[cfg(windows)]
-    let full_path = {
-        if full_path.extension().is_none() {
-            full_path.with_extension("exe")
-        } else {
-            full_path
-        }
-    };
-
-    #[allow(unused)]
-    if full_path.is_file() {
-        match full_path.extension().unwrap().to_str().unwrap() {
-            "exe" => Some(Runner::Executable { path: full_path }),
-            inter => {
-                // allow the user to pass interpreters and an regex match
-                // and then pass all files to the interpreters if they just get called as an path
-                todo!()
-            }
-            _ => None,
-        }
-    } else {
-        None
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter)]
 pub enum BuiltIn {
@@ -376,11 +315,6 @@ pub static BUILTIN_COMMANDS: phf::Map<&'static str, BuiltIn> = phf_map! {
     "help" => BuiltIn::Help,
 };
 
-pub fn find_in_builtin(bin_name: &str) -> Option<Runner> {
-    Some(Runner::InBuilt(
-        BuiltIn::from(&bin_name.to_lowercase())?.clone(),
-    ))
-}
 
 pub fn malloc_stress_process(dur: Duration) {
     let mut v = Vec::<u8>::new();

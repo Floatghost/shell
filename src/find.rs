@@ -20,6 +20,54 @@ impl Found {
     }
 }
 
+pub fn resolve(cmd: &str) -> Option<Found> {
+    if let Some(b) = BuiltIn::from(cmd) {
+        return Some(Found::BuiltIn(b));
+    }
+
+    let pathext = std::env::var("PATHEXT").unwrap_or_default();
+    let allowed_exec: Vec<String> = pathext
+        .split(';')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.trim_start_matches('.').to_ascii_lowercase())
+        .collect();
+
+    let check_file = |path: PathBuf| -> Option<PathBuf> {
+        if path.is_file() {
+            return Some(path);
+        }
+        for ext in &allowed_exec {
+            let mut p_os = path.as_os_str().to_owned();
+            p_os.push(".");
+            p_os.push(ext);
+            let p = PathBuf::from(p_os);
+
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+        None
+    };
+
+    if let Ok(current_dir) = std::env::current_dir() {
+        let local = current_dir.join(cmd);
+        if let Some(p) = check_file(local) {
+            return Some(Found::Path(p));
+        }
+    }
+
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            let full = dir.join(cmd);
+            if let Some(p) = check_file(full) {
+                return Some(Found::EnvPath(p));
+            }
+        }
+    }
+
+    None
+}
+
 pub fn complete_command(prefix: &str) -> Vec<Found> {
     let mut out = Vec::new();
     let paths = std::env::var("PATH").unwrap_or_default();
