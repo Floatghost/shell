@@ -73,9 +73,9 @@ impl Editor {
     fn get_visual_width(&self) -> usize {
         let byte_idx = self.get_byte_idx();
 
-        let col = unicode_width::UnicodeWidthStr::width(&self.buffer[..byte_idx]);
+        
 
-        col
+        unicode_width::UnicodeWidthStr::width(&self.buffer[..byte_idx])
     }
 
     /// insert at the pos of the cursor
@@ -198,7 +198,7 @@ impl Editor {
                         results.extend(find::complete_path(&focused.raw));
 
                         if !results.is_empty() {
-                            results.sort_by(|a, b| a.file_name().len().cmp(&b.file_name().len()));
+                            results.sort_by_key(|a| a.file_name().len());
                             let first = results[0].file_name();
                             if results.len() > 1 {
                                 self.tab_cache = Some(results.clone());

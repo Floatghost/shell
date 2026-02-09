@@ -33,7 +33,7 @@ pub fn get_event() -> std::io::Result<EditorCommand> {
 
             use EditorCommand as EC;
 
-            return Ok(match key {
+            Ok(match key {
                 #[allow(unused)]
                 KeyEvent {
                     code,
@@ -54,11 +54,11 @@ pub fn get_event() -> std::io::Result<EditorCommand> {
                     KeyCode::Down => EC::HistoryNext,
                     _ => EC::NoOp,
                 },
-            });
+            })
         }
         crossterm::event::Event::Paste(pasting) => {
-            return Ok(EditorCommand::Paste(pasting));
+            Ok(EditorCommand::Paste(pasting))
         }
-        _ => return Ok(EditorCommand::NoOp),
+        _ => Ok(EditorCommand::NoOp),
     }
 }

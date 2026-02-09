@@ -43,7 +43,7 @@ impl ShellConfig {
             fs::create_dir_all(parent)?;
         }
 
-        let mut file = fs::File::create(&filepath)?;
+        let mut file = fs::File::create(filepath)?;
         file.write_all(contents.as_bytes())?;
 
         Ok(contents)

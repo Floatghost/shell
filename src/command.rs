@@ -97,12 +97,12 @@ impl Command {
                     use std::fs;
 
                     println!(
-                        "{:<6}  {:<15}  {:>8}  {}",
-                        "Mode", "LastWriteTime", "Length", "Name"
+                        "{:<6}  {:<15}  {:>8}  Name",
+                        "Mode", "LastWriteTime", "Length"
                     );
                     println!(
-                        "{:<6}  {:<15}  {:>8}  {}",
-                        "----", "-------------", "------", "----"
+                        "{:<6}  {:<15}  {:>8}  ----",
+                        "----", "-------------", "------"
                     );
 
                     for entry in fs::read_dir(&state.cwd).unwrap() {
@@ -137,7 +137,7 @@ impl Command {
                     None
                 }
                 BuiltIn::Where => {
-                    if self.args.len() < 1 {
+                    if self.args.is_empty() {
                         return Some(1);
                     }
                     let query = match Command::new(&self.args.join(" ")) {
@@ -387,7 +387,7 @@ pub fn malloc_stress_process(dur: Duration) {
 
     if cfg!(debug_assertions) {
         for _ in 0..50 {
-            v.extend(std::iter::repeat(0u8).take(1024 * 1024)); // 1 MB
+            v.extend(std::iter::repeat_n(0u8, 1024 * 1024)); // 1 MB
         }
 
         std::thread::sleep(dur);
