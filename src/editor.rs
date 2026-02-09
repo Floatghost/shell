@@ -37,8 +37,11 @@ impl Editor {
         &mut self,
         renderer: &mut RenderEngine,
         prompt: &str,
+        history: &[String],
     ) -> std::io::Result<String> {
         renderer.render_new_prompt(prompt);
+
+        let mut history_clock = history.len();
 
         loop {
             let command_event = input::get_event()?;
@@ -49,7 +52,7 @@ impl Editor {
                 _ => (),
             }
 
-            self.apply(command_event);
+            self.apply(command_event, history, &mut history_clock);
 
             let highlighted = highlight(&self.buffer);
 
@@ -142,7 +145,12 @@ impl Editor {
         self.cursor_char_idx = self.buffer[..new_cursor_byte].chars().count();
     }
 
-    fn apply(&mut self, command_event: EditorCommand) {
+    fn apply(
+        &mut self,
+        command_event: EditorCommand,
+        history: &[String],
+        history_clock: &mut usize,
+    ) {
         let mut clear_cache = true;
 
         match command_event {
@@ -200,10 +208,21 @@ impl Editor {
                             results.sort_by(|a, b| a.file_name().len().cmp(&b.file_name().len()));
                             let first = results[0].file_name();
                             if results.len() > 1 {
-                                self.tab_cache = Some(results);
+                                self.tab_cache = Some(results.clone());
                                 self.tab_clock = 1;
                             }
-                            first
+
+                            // dont autocomplete already complete commands
+                            if first == focused.raw {
+                                if results.len() >= 2 {
+                                    self.tab_clock = 2;
+                                    results[1].file_name()
+                                } else {
+                                    return;
+                                }
+                            } else {
+                                first
+                            }
                         } else {
                             return;
                         }
@@ -212,8 +231,31 @@ impl Editor {
                 }
             }
             EditorCommand::Enter => return, // get_userinput should handle this
-            EditorCommand::HistoryPrev => todo!(),
-            EditorCommand::HistoryNext => todo!(),
+            EditorCommand::HistoryPrev => {
+                if history.is_empty() {
+                    return;
+                }
+
+                *history_clock = history_clock.saturating_sub(1);
+                let new_prompt = history[*history_clock].clone();
+                self.cursor_char_idx = new_prompt.chars().count();
+                self.buffer = new_prompt;
+            }
+            EditorCommand::HistoryNext => {
+                if history.is_empty() {
+                    return;
+                }
+
+                if *history_clock + 1 > history.len() - 1 {
+                    self.buffer = String::new();
+                    self.cursor_char_idx = 0;
+                } else {
+                    *history_clock += 1;
+                    let new_promt = history[*history_clock].clone();
+                    self.cursor_char_idx = new_promt.chars().count();
+                    self.buffer = new_promt;
+                }
+            }
             EditorCommand::Paste(pasting) => {
                 self.insert_str(&pasting);
                 // todo support multiline

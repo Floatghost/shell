@@ -60,6 +60,8 @@ fn main() {
     let mut editor = Editor::new();
     let mut renderer = &mut RenderEngine::new();
 
+    let mut history: Vec<String> = Vec::new();
+
     loop {
         state.refresh();
         let prompt = render_prompt(&state, &config);
@@ -75,7 +77,11 @@ fn main() {
         //     },
         // };
 
-        let userinput = editor.get_userinput(&mut renderer, &prompt).unwrap();
+        let userinput = editor
+            .get_userinput(&mut renderer, &prompt, &history)
+            .unwrap();
+
+        history.push(userinput.clone());
 
         let tokens = tokenize(&userinput);
 

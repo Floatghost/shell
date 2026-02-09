@@ -132,6 +132,9 @@ impl Command {
                     None
                 }
                 BuiltIn::Where => {
+                    if self.args.len() < 1 {
+                        return Some(1);
+                    }
                     let query = match Command::new(&self.args[0], &self.args[1..]) {
                         Some(com) => com,
                         None => return Some(1),
