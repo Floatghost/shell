@@ -1,4 +1,3 @@
-mod parse_input;
 use std::{
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
@@ -16,17 +15,15 @@ mod highlight;
 mod input;
 mod parser;
 mod prompt_render;
-mod readline;
 mod render;
 mod userinput;
 
 use crate::{
     app::State,
     command::{BuiltIn, Command, Runner, malloc_stress_process},
-    config::ShellConfig,
+    config::{Color, ShellConfig},
     editor::Editor,
-    parse_input::tokenize,
-    prompt_render::render_prompt,
+    prompt_render::construct_prompt,
     render::RenderEngine,
 };
 
@@ -45,7 +42,7 @@ fn main() {
     .expect("failed to set ctrl-c handler");
 
     if std::env::args().any(|a| a == "--malloc-stress") {
-        malloc_stress_process(Duration::from_secs(10));
+        malloc_stress_process(Duration::from_secs(20));
         return;
     }
 
@@ -58,24 +55,13 @@ fn main() {
     let mut return_code = None;
 
     let mut editor = Editor::new();
-    let mut renderer = &mut RenderEngine::new();
+    let mut renderer = RenderEngine::new();
 
     let mut history: Vec<String> = Vec::new();
 
     loop {
         state.refresh();
-        let prompt = render_prompt(&state, &config);
-
-        // let last_prompt_line = prompt.lines().last().unwrap();
-
-        // let mut readline = ReadLine::new(last_prompt_line);
-        // let userinput = match readline.get_line() {
-        //     Ok(n) => n,
-        //     Err(e) => match e.as_str() {
-        //         "ctrl-c" => continue,
-        //         _ => panic!("ERROR: {}", e),
-        //     },
-        // };
+        let prompt = construct_prompt(&state, &config);
 
         let userinput = editor
             .get_userinput(&mut renderer, &prompt, &history)
@@ -83,16 +69,11 @@ fn main() {
 
         history.push(userinput.clone());
 
-        let tokens = tokenize(&userinput);
-
-        if tokens.is_empty() {
+        if userinput.trim().is_empty() {
             continue;
         }
 
-        let exec = &tokens[0];
-        let args = &tokens[1..];
-
-        let internal_command = Command::new(exec, args);
+        let internal_command = Command::new(&userinput);
 
         if let Some(command) = internal_command {
             if let Runner::InBuilt(com) = &command.runner
@@ -107,7 +88,11 @@ fn main() {
             return_code = command.exec(&mut state, &mut config);
             enable_raw_mode().unwrap();
         } else {
-            println!("could not find \"{}\"", &exec);
+            println!(
+                "{}invalid input \"{}\"\x1b[0m",
+                Color::Red.to_ansi_fg(),
+                userinput
+            );
         }
 
         editor.clear();

@@ -1,6 +1,6 @@
 use std::{
     env,
-    io::{BufWriter, stdout},
+    io::stdout,
     os::windows::process::CommandExt,
     path::PathBuf,
     process::Stdio,
@@ -13,7 +13,7 @@ use rand::Rng;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::{app::State, config::ShellConfig};
+use crate::{app::State, config::ShellConfig, parser::parse};
 
 pub struct Command {
     pub runner: Runner,
@@ -29,7 +29,12 @@ pub enum Runner {
 }
 
 impl Command {
-    pub fn new(exec: &str, args: &[String]) -> Option<Command> {
+    pub fn new(command: &str) -> Option<Command> {
+        let tokens = parse(command);
+
+        let exec = &tokens[0].raw;
+        let args: Vec<String> = tokens[1..].iter().map(|t| t.raw.to_string()).collect();
+
         if let Some(run) = find_in_builtin(exec) {
             return Some(Command {
                 runner: run,
@@ -135,7 +140,7 @@ impl Command {
                     if self.args.len() < 1 {
                         return Some(1);
                     }
-                    let query = match Command::new(&self.args[0], &self.args[1..]) {
+                    let query = match Command::new(&self.args.join(" ")) {
                         Some(com) => com,
                         None => return Some(1),
                     };

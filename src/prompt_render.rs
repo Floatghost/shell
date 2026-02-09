@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::io::Write;
 
 use chrono::Local;
 use sysinfo::System;
@@ -9,18 +8,7 @@ use crate::{
     config::{ColorValue, ShellConfig},
 };
 
-pub fn render_prompt(state: &State, cfg: &ShellConfig) -> String {
-    let prompt = construct_prompt(state, cfg);
-
-    // print!("{}", prompt);
-
-    // print!("\x1b[0m");
-
-    // std::io::stdout().flush().unwrap();
-    prompt
-}
-
-fn construct_prompt(state: &State, cfg: &ShellConfig) -> String {
+pub fn construct_prompt(state: &State, cfg: &ShellConfig) -> String {
     let mut blocks = Blocks::new();
 
     let def_fg = cfg.theme.fg.clone();

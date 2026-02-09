@@ -1,5 +1,3 @@
-use unicode_width::UnicodeWidthStr;
-
 use crate::{
     find::{self, Found},
     highlight::highlight,
@@ -8,11 +6,6 @@ use crate::{
     render::{RenderEngine, TerminalPos},
     userinput::{self, Token},
 };
-
-pub struct BufferPos {
-    pub x: u32,
-    pub y: u32,
-}
 
 pub struct Editor {
     buffer: String,
@@ -271,17 +264,4 @@ impl Editor {
 
         self.cursor_pos.x = self.get_visual_width() as u16;
     }
-}
-
-/// does not handle color
-fn get_terminal_length(input: &str) -> usize {
-    let width = UnicodeWidthStr::width(input);
-
-    width
-}
-
-/// this is just here so its more explicit than rusts .len() which
-/// you could mistake for char len instead of byte len
-fn get_bytes_length(input: &str) -> usize {
-    input.len()
 }
