@@ -73,9 +73,7 @@ fn main() {
             continue;
         }
 
-        let internal_command = Command::new(&userinput);
-
-        if let Some(command) = internal_command {
+        if let Some(command) = Command::new(&userinput) {
             if let Runner::InBuilt(com) = &command.runner
                 && com == &BuiltIn::Exit
             {

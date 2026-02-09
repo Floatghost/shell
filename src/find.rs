@@ -13,7 +13,7 @@ pub enum Found {
 impl Found {
     pub fn file_name(&self) -> String {
         match self {
-            Found::Path(p) => p.file_name().unwrap().to_str().unwrap().to_string(),
+            Found::Path(p) => p.to_str().unwrap().to_string(),
             Found::EnvPath(envp) => envp.file_name().unwrap().to_str().unwrap().to_string(),
             Found::BuiltIn(b) => b.to_string(),
         }
