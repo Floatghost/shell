@@ -2,7 +2,7 @@
 🔥🔥Blazingly🔥🔥🚀🚀fast🚀🚀 🔥🔥 shell written in Rust 🦀🦀🦀🦀🦀
 
 # Huge Community🥳
-since this shell has a huge community (as of writing: 1 star⭐) there are many plugins that let you extend the shells functionality
+since this shell has a huge community (as of writing: 2 stars⭐) there are many plugins that let you extend the shells functionality
 
 # Plugins 🔌
 plugins are currently in dev and are expected to release in 2067
